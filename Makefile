@@ -1,7 +1,7 @@
 # Disable built-in rules
 MAKEFLAGS += -R -r
 
-JOBS ?= $(shell nproc)
+#JOBS ?= $(shell nproc)
 
 .PHONY:	all clean run
 
@@ -11,21 +11,23 @@ bdir := .build
 pdir := mmo
 
 CXX = clang++
-CXXFLAGS = -std=c++2c # -Wall -Wextra
+CXXFLAGS = -std=c++2c -I$(pdir) # -Wall -Wextra
 LDFLAGS = $(CXXFLAGS)
 
 all: | $(bdir)/main main
 
 # General dependencies
 $(bdir)/main.o: $(bdir)/types.pcm $(bdir)/common.pcm
-$(bdir)/main.o: CXXFLAGS += -fmodule-file=types=$(bdir)/types.pcm -fmodule-file=common=$(bdir)/common.pcm
-$(bdir)/main: $(bdir)/main.o | $(bdir)
-	$(CXX) $(LDFLAGS) -o $@ $^
+$(bdir)/main: CXXFLAGS += -fprebuilt-module-path=$(bdir)/
+$(bdir)/main: LDFLAGS += $(shell pkg-config libpng --libs)
+
+$(bdir)/main: $(bdir)/main.o $(bdir)/png_wrap.o $(bdir)/utils.o | $(bdir)
+	$(CXX) $(LDFLAGS) -lstdc++fs -o $@ $^
 
 $(bdir)/png_wrap.o: CXXFLAGS += $(shell pkg-config libpng --cflags)
-$(bdir)/png_wrap: LDFLAGS += $(shell pkg-config libpng --libs)
-$(bdir)/png_wrap: $(bdir)/png_wrap.o $(bdir)/utils.o
-	$(CXX) $(LDFLAGS) -o $@ $^
+#$(bdir)/png_wrap: LDFLAGS += $(shell pkg-config libpng --libs)
+#$(bdir)/png_wrap: $(bdir)/png_wrap.o $(bdir)/utils.o
+#	$(CXX) $(LDFLAGS) -o $@ $^
 
 $(bdir):
 	mkdir $@

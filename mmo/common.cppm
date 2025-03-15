@@ -5,8 +5,8 @@ module;
 #include <vector>
 
 //#include <iostream>
-export module utils;
-export namespace utils {
+export module common;
+export namespace common {
 
 template <typename T = unsigned long, unsigned long DEF_UPDATE_EVERY = 64>
 class RandGen {

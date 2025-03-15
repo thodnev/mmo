@@ -1,6 +1,5 @@
 module;     // Global module fragment
 #include <cstdint>
-#include <format>
 #include <iostream>
 #include <string>
 #include <utility>
