@@ -60,8 +60,10 @@ private:
 
 class BinMask {
 public:
+    using coord_t = unsigned long;
+
     std::vector<uint8_t> flat;
-    unsigned long width, height;
+    coord_t width, height;
     std::variant<
         std::vector<uint8_t>,
         std::vector<uint16_t>,
@@ -74,9 +76,10 @@ public:
     BinMask(const std::filesystem::path &file) { this->from_png(file); }
     
     size_t num_set_bits();
-    
+
+    bool get_value(const coord_t x, const coord_t y);
     // returns coordinates of i-th non-zero element
-    std::pair<unsigned long, unsigned long> get_coords_nonzero(const size_t elnum);
+    std::pair<coord_t, coord_t> get_coords_nonzero(const size_t elnum);
 
 private:
     void from_png(const std::filesystem::path &file);
@@ -138,7 +141,22 @@ size_t BinMask::num_set_bits()
 }
 
 
-std::pair<unsigned long, unsigned long> BinMask
+bool BinMask::get_value(const coord_t x, const coord_t y)
+{
+    if ((x >= this->width) || (y >= this->height)) {
+        throw std::out_of_range(std::format(
+            "Coordinates ({}, {}) out of {}x{} size",
+            x, y, this->width, this->height
+            ));
+    }
+
+    size_t idx = y * this->width + x;
+    auto byte = this->flat[idx / 8];
+    return byte & (1 << (7 - (idx % 8)));
+}
+
+
+std::pair<BinMask::coord_t, BinMask::coord_t> BinMask
     ::get_coords_nonzero(const size_t elnum)
 {
     auto totalnum = this->num_set_bits();

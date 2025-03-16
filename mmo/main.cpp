@@ -42,6 +42,16 @@ int main(const int argc, char * const argv[])
     //     std::cout << "(" << x << ", " << y << ")" << ",\t";
     // }
     // std::cout << std::endl;
+
+    // std::cout << "IMAGE DATA:\n";
+    // for (auto row = 0; row < mask.height; row++) {
+    //     for (auto col = 0; col < mask.width; col++) {
+    //         auto el = mask.get_value(col, row);
+    //         std::cout << (el ? "##" : "__");
+    //     }
+    //     std::cout << std::endl;
+    // }
     
+    //std::cout << "out of bonds: " << mask.get_value(33, 37) << std::endl;
     return 0;
 }

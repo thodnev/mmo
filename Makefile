@@ -22,7 +22,7 @@ $(bdir)/main: CXXFLAGS += -fprebuilt-module-path=$(bdir)/
 $(bdir)/main: LDFLAGS += $(shell pkg-config libpng --libs)
 
 $(bdir)/main: $(bdir)/main.o $(bdir)/png_wrap.o $(bdir)/utils.o $(bdir)/common.pcm | $(bdir)
-	$(CXX) $(LDFLAGS) -lstdc++fs -o $@ $^
+	$(CXX) $(LDFLAGS) -o $@ $^
 
 $(bdir)/png_wrap.o: CXXFLAGS += $(shell pkg-config libpng --cflags)
 #$(bdir)/png_wrap: LDFLAGS += $(shell pkg-config libpng --libs)
