@@ -11,8 +11,8 @@ bdir := .build
 pdir := mmo
 
 CXX = clang++
-CXXFLAGS = -std=c++2c -I$(pdir) # -Wall -Wextra
-LDFLAGS = $(CXXFLAGS)
+CXXFLAGS = -std=c++2c -I$(pdir) -DDEBUG # -Wall -Wextra
+LDFLAGS = -std=c++2c
 
 all: | $(bdir)/main main
 
@@ -21,7 +21,7 @@ $(bdir)/main.o: $(bdir)/types.pcm $(bdir)/common.pcm
 $(bdir)/main: CXXFLAGS += -fprebuilt-module-path=$(bdir)/
 $(bdir)/main: LDFLAGS += $(shell pkg-config libpng --libs)
 
-$(bdir)/main: $(bdir)/main.o $(bdir)/png_wrap.o $(bdir)/utils.o | $(bdir)
+$(bdir)/main: $(bdir)/main.o $(bdir)/png_wrap.o $(bdir)/utils.o $(bdir)/common.pcm | $(bdir)
 	$(CXX) $(LDFLAGS) -lstdc++fs -o $@ $^
 
 $(bdir)/png_wrap.o: CXXFLAGS += $(shell pkg-config libpng --cflags)
@@ -36,9 +36,8 @@ clean:
 	rm -rf $(bdir)
 
 main: $(bdir)/main
-	-ln -s $< $@
 
-run: main
+run: $(bdir)/main
 	@./$<
 
 $(bdir)/%.pcm: $(pdir)/%.cppm | $(bdir)

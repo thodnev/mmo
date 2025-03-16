@@ -1,7 +1,14 @@
 module;
+#include "macro.hpp"
+#include "png_wrap.hpp"
+#include "utils.hpp"
 #include <cstdint>
+#include <format>
+#include <filesystem>
 #include <functional>
+#include <iostream>
 #include <limits>
+#include <variant>
 #include <vector>
 
 //#include <iostream>
@@ -53,10 +60,106 @@ private:
 
 class BinMask {
 public:
-    std::vector<uint8_t> data;
+    std::vector<uint8_t> flat;
     unsigned long width, height;
+    std::variant<
+        std::vector<uint8_t>,
+        std::vector<uint16_t>,
+        std::vector<uint32_t>,
+        std::vector<uint64_t>
+        >   indices_set_bits;
 
+    BinMask() : flat(), width(0), height(0) {};
 
+    BinMask(const std::filesystem::path &file) { this->from_png(file); }
+    
+    size_t num_set_bits();
+    
+    // returns coordinates of i-th non-zero element
+    std::pair<unsigned long, unsigned long> get_coords_nonzero(const size_t elnum);
+
+private:
+    void from_png(const std::filesystem::path &file);
+    void _set_indices();
 };
+
+
+void BinMask::from_png(const std::filesystem::path &file)
+{
+    png_wrap::PngImage img(file);
+    this->flat = utils::flatten_bits(img.data, img.width, img.height);
+    this->width = img.width;
+    this->height = img.height;
+    this->_set_indices();
+}
+
+void BinMask::_set_indices()
+{
+    //this->num_set_bits = utils::count_bits(this->flat);
+
+    size_t dim = this->width * this->height;
+    if (dim >= std::numeric_limits<uint32_t>::max()) {
+        this->indices_set_bits = std::vector<uint64_t>();
+        LOG("Chosen {}-bit vector", 64);
+    } else if (dim >= std::numeric_limits<uint16_t>::max()) {
+        this->indices_set_bits = std::vector<uint32_t>();
+        LOG("Chosen {}-bit vector", 32);
+    } else if (dim >= std::numeric_limits<uint8_t>::max()) {
+        this->indices_set_bits = std::vector<uint32_t>();
+        LOG("Chosen {}-bit vector", 16);
+    } else {
+        this->indices_set_bits = std::vector<uint8_t>();
+        LOG("Chosen {}-bit vector", 8);
+    }
+
+    size_t found = 0;
+    for (size_t nbit = 0; nbit < dim; nbit++) {
+        auto byte = this->flat[nbit / 8];
+        auto idx = 7 - (nbit % 8);
+        if (byte & (1 << idx)) {
+            // Access the correct vector type using std::visit
+            std::visit([nbit](auto& vec) {
+                vec.push_back(nbit);
+            }, this->indices_set_bits);
+
+            found++;
+        }
+    }
+}
+
+size_t BinMask::num_set_bits()
+{
+    size_t totalnum;
+    std::visit([&totalnum](auto& vec) {
+        totalnum = vec.size();
+    }, this->indices_set_bits);
+
+    return totalnum;
+}
+
+
+std::pair<unsigned long, unsigned long> BinMask
+    ::get_coords_nonzero(const size_t elnum)
+{
+    auto totalnum = this->num_set_bits();
+
+    if (elnum >= totalnum) {
+        throw std::out_of_range(std::format(
+            "Element {} >= {}", elnum, totalnum
+            ));
+    }
+
+    // get index in flat array
+    size_t index;
+    std::visit([&index, elnum](auto& vec) {
+        index = vec[elnum];
+    }, this->indices_set_bits);
+
+    // transform flat index to coordinate pair
+    auto y = index / this->width;
+    auto x = index - y * this->width;
+
+    return {x, y};
+}
 
 };      // namespace

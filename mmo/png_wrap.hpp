@@ -22,8 +22,7 @@ public:
 };
 
 
-template <typename flat_uint = unsigned long,
-          unsigned long MAX_DIM = 4096 * 4096>
+template <unsigned long MAX_DIM = 4096 * 4096>
 class PngImage {
 public:
     //std::filesystem::path file;
@@ -32,15 +31,15 @@ public:
 
     PngImage() : data(), width(0), height(0) {};
 
-    PngImage(std::filesystem::path file) { read_file(file); };
+    PngImage(const std::filesystem::path &file) { read_file(file); };
 private:
-    void read_file(std::filesystem::path file);
+    void read_file(const std::filesystem::path &file);
 };
 
 
-template <typename flat_uint, unsigned long MAX_DIM>
-void PngImage<flat_uint, MAX_DIM>
-     ::read_file(std::filesystem::path file)
+template <unsigned long MAX_DIM>
+void PngImage<MAX_DIM>
+     ::read_file(const std::filesystem::path &file)
 {
     std::FILE *fp = fopen(file.c_str(), "rb");
     if (nullptr == fp) {

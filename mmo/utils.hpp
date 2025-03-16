@@ -1,3 +1,5 @@
+#include <bit>
+#include <concepts>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -24,5 +26,27 @@ std::vector<uint8_t> flatten_bits(
     unsigned long width,
     unsigned long height
 );
+
+
+template<std::integral T>
+size_t count_bits(const T data[], const size_t len)
+{
+    size_t res = 0;
+    for (size_t n = 0; n < len; n++) {
+        res += std::popcount(data[n]);
+    }
+    return res;
+}
+
+template<std::integral T>
+size_t count_bits(const std::vector<T> &vec)
+{
+    return count_bits(vec.data(), vec.size());
+    // size_t res = 0;
+    // for (auto el : &vec) {
+    //     res += std::popcount(el);
+    // }
+    // return res;
+}
 
 }   // namespace

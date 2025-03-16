@@ -4,7 +4,7 @@
 #include <iostream>
 
 //import types;
-//import common;
+import common;
 
 uint8_t rndzero() {
     return 0;
@@ -23,13 +23,25 @@ int main(const int argc, char * const argv[])
     //     std::cout << i << " : " << (uint32_t)rnd.random(0, 5) << std::endl;
     // }
 
-    png_wrap::PngImage img("minimap/test4.png");
-    std::cout << std::format("Image size: {} x {}\n", img.width, img.height);
-    auto flat = utils::flatten_bits(img.data, img.width, img.height);
-    std::cout << "FLAT SIZE: " << flat.size() << std::endl;
-    std::cout << "\n=========\n" << utils::to_string(flat) << std::endl;
-    // std::vector<char> tst = {'h', 'e', 'l', 'l', 'o'};
-    // std::cout << "\n=========\n" << utils::to_string(tst) << std::endl;
-    std::cout << "DONE" << std::endl;
+    // png_wrap::PngImage img("minimap/test4.png");
+    // std::cout << std::format("Image size: {} x {}\n", img.width, img.height);
+    // auto flat = utils::flatten_bits(img.data, img.width, img.height);
+    // std::cout << "FLAT SIZE: " << flat.size() << std::endl;
+    // std::cout << "\n=========\n" << utils::to_string(flat) << std::endl;
+
+    // std::cout << "Flat 1s: " << utils::count_bits(flat) << std::endl;
+    // std::cout << "DONE" << std::endl;
+
+    common::BinMask mask("minimap/test4.png");
+    std::cout << std::format("Mask size: {} x {}\n", mask.width, mask.height);
+    std::cout << std::format("  set bits: {}\n", mask.num_set_bits());
+
+    // std::cout << "NON-ZERO POINTS:\n";
+    // for (size_t bit = 0; bit < mask.num_set_bits(); bit++) {
+    //     auto [x, y] = mask.get_coords_nonzero(bit);
+    //     std::cout << "(" << x << ", " << y << ")" << ",\t";
+    // }
+    // std::cout << std::endl;
+    
     return 0;
 }
