@@ -15,16 +15,17 @@ module;
 export module common;
 export namespace common {
 
-template <typename T = unsigned long, unsigned long DEF_UPDATE_EVERY = 64>
-class RandGen {
+template <typename T = unsigned long>
+class RandGenBase {
 public:
     uint64_t last = 0;
 
-    std::function<const T()> random_func;
-    decltype(DEF_UPDATE_EVERY) update_every, update_cnt;
+    unsigned long update_every, update_cnt;
 
-    RandGen(decltype(random_func) random_func, decltype(update_every) update_every = DEF_UPDATE_EVERY)
-        : random_func(random_func), update_every(update_every)
+    virtual ~RandGenBase() {};
+
+    RandGenBase(decltype(update_every) update_every = 64)
+        : update_every(update_every)
     {
         update();
     }
@@ -44,6 +45,9 @@ public:
         return (randval() % (to - from + 1)) + from;
     }
 
+protected:
+    virtual const T random_func();
+
 private:
     T randval()
     {
@@ -56,6 +60,27 @@ private:
         return last;
     }
 };
+
+
+template <typename T = unsigned long>
+class RandGenLinux : public RandGenBase<T>
+{
+public:
+    RandGenLinux(decltype(RandGenBase<T>::update_every) update_every = 64,
+                 const std::filesystem::path &randfile = "/dev/urandom")
+        : RandGenBase<T>(update_every)
+    {
+        // @TODO: ...
+    }
+
+protected:
+    const T random_func() override
+    {
+        // @TODO: ...
+    };
+};
+
+
 
 
 class BinMask {
