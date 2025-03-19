@@ -3,8 +3,9 @@
 #include <cstdint>
 #include <iostream>
 
-//import types;
 import common;
+import rnd;
+//import types;
 
 uint8_t rndzero() {
     return 0;
