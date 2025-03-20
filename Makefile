@@ -37,13 +37,11 @@ obj_files := $(call obj,$(objs))
 
 all: | $(bdir)/main main
 
-# Tests
-test_%: $(bdir)/test_%
-	./$<
+# Test dependencies
+$(bdir)/test_rnd: $(call tst,rnd) $(call pcm,rnd)
+$(bdir)/test_binmask: LDFLAGS += $(shell pkg-config libpng --libs)
+$(bdir)/test_binmask: $(call tst,binmask) $(call pcm,common) $(call obj,utils)
 
-$(bdir)/test_rnd: $(call tst, rnd) $(call pcm,rnd) | $(bdir)
-	$(CXX) $(LDFLAGS) -fprebuilt-module-path=$(bdir)/ -o $@ $^
-	
 # General dependencies
 $(bdir)/main.o: $(pcm_modules)
 
@@ -76,5 +74,8 @@ $(bdir)/%.o: $(pdir)/%.cpp | $(bdir)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # Tests
-# $(bdir)/test_%: $(tdir)/test_%.cpp | $(bdir)
-# 	$(CXX) $(CXXFLAGS) -o $@ $<
+$(bdir)/test_%: $(call tst, %) | $(bdir)
+	$(CXX) $(LDFLAGS) -fprebuilt-module-path=$(bdir)/ -o $@ $^
+
+test_%: $(bdir)/test_%
+	./$<	

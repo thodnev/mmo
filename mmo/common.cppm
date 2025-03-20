@@ -37,12 +37,15 @@ private:
 class IndexedBinMask : public BinMask {
 public:
     std::variant<
+        //std::monostate,     // prevent default initialization of vectors
         std::vector<uint8_t>,
         std::vector<uint16_t>,
         std::vector<uint32_t>,
         std::vector<uint64_t>
         >   indices_set_bits;
 
+    // @TODO: combine constructors into one
+    //        using const std::filesystem::path &file = {}
     IndexedBinMask() : BinMask() { this->_set_indices(); }
     IndexedBinMask(const std::filesystem::path &file) : BinMask(file)
     {
