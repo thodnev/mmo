@@ -12,7 +12,7 @@ private:
     std::string message;
 
 public:
-    PngError(const std::string &msg) {};
+    PngError(const std::string &msg) : message(msg) {}
 
     // Override the what() method
     virtual const char* what() const noexcept override
@@ -134,7 +134,7 @@ void PngImage<MAX_DIM>
     std::vector<std::vector<uint8_t>> matrix(imheight, std::vector<uint8_t>(rowbytes));
     // convert std::vector to a C-style array for compatibility
     std::vector<uint8_t *> c_matrix(imheight);
-    for (auto i = 0; i < imheight; i++) {
+    for (decltype(imheight) i = 0; i < imheight; i++) {
         c_matrix[i] = matrix[i].data(); // pointer to the first element of each row
     }
     

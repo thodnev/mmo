@@ -15,9 +15,9 @@ public:
 
     unsigned long update_every, update_cnt;
 
-    virtual ~RandGenBase() {};
+    virtual ~RandGenBase() = default;
 
-    RandGenBase(decltype(update_every) update_every = 64)
+    explicit RandGenBase(decltype(update_every) update_every = 64)
         : update_every(update_every), update_cnt(update_every) {}
 
     T update()
@@ -31,15 +31,26 @@ public:
     T random(T from = std::numeric_limits<T>::min(),
              T to = std::numeric_limits<T>::max())
     {
-        //std::cout << " [" << this->last << " @ " << this->update_every << " @ " << this->update_cnt << "] ";
-        return (randval() % (to - from + 1)) + from;
+        [[unlikely]] if (from == to) return from;
+        [[unlikely]] if (from > to) std::swap(from, to);
+
+        auto maxval = std::numeric_limits<T>::max();
+        auto range = to - from;
+        auto maxdiv = maxval - (maxval % range);
+
+        auto rnd = randval();
+        [[unlikely]] while (rnd > maxdiv) {    // discard
+            rnd = randval();      // regenerate
+        }
+
+        return (rnd % (to - from + 1)) + from;
     }
 
 protected:
-    virtual const T random_func() =0;       // abstract method
+    virtual T random_func() =0;       // abstract method
 
 private:
-    T randval()
+    auto randval()
     {
         if (++update_cnt >= update_every) {
             update();
@@ -56,12 +67,15 @@ template <typename T = unsigned long>
 class RandGenLinux : public RandGenBase<T>
 {
 public:
-    RandGenLinux(decltype(RandGenBase<T>::update_every) update_every = 64,
+    explicit RandGenLinux(decltype(RandGenBase<T>::update_every) update_every = 64,
                  const std::filesystem::path &rand_file = "/dev/urandom")
-        : RandGenBase<T>(update_every), rand_stream(rand_file, std::ios::binary) {}
+        : RandGenBase<T>(update_every), rand_stream(rand_file, std::ios::binary)
+    {
+        rand_stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    }
 
 protected:
-    virtual const T random_func() override
+    virtual T random_func() override
     {
         T ret = 0;
         rand_stream.read(reinterpret_cast<char *>(&ret), sizeof(ret));

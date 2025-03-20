@@ -70,7 +70,6 @@ void BinMask::_set_indices()
         LOG("Chosen {}-bit vector", 8);
     }
 
-    size_t found = 0;
     for (size_t nbit = 0; nbit < dim; nbit++) {
         auto byte = this->flat[nbit / 8];
         auto idx = 7 - (nbit % 8);
@@ -79,8 +78,6 @@ void BinMask::_set_indices()
             std::visit([nbit](auto& vec) {
                 vec.push_back(nbit);
             }, this->indices_set_bits);
-
-            found++;
         }
     }
 }

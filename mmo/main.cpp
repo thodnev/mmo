@@ -17,11 +17,12 @@ int main(const int argc, char * const argv[])
     // std::cout << stat << std::endl << "Size is: " << sizeof stat << std::endl;
 
     rnd::RandGenLinux rng(500, "/dev/random");
-    auto maxop = 1e8;
+    auto maxop = 1e9;
     unsigned long sum = 0;
     auto start = std::chrono::high_resolution_clock::now();
     for (unsigned long long i = 0; i < maxop; i++) {
-        auto result = rng.random(0, 1000);
+        auto result = rng.random(0, 502);
+        //std::cout << result << std::endl;
         sum += result;
     }
     auto end = std::chrono::high_resolution_clock::now();

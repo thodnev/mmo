@@ -15,8 +15,8 @@ std::vector<uint8_t> flatten_bits(
     // others need to be rotated by difference
     auto nback = width % 8;
     auto carry = matrix[0].back();
-    for (auto nrow = 1; nrow < height; nrow++) {
-        for (auto nb = 0; nb < matrix[0].size() - 1; nb++) {
+    for (decltype(height) nrow = 1; nrow < height; nrow++) {
+        for (size_t nb = 0; nb < matrix[0].size() - 1; nb++) {
             auto cur = matrix[nrow][nb];
 
             auto el = carry | (cur >> nback);
