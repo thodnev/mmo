@@ -2,10 +2,11 @@
 MAKEFLAGS += --no-builtin-variables --no-builtin-rules
 MAKEFLAGS += --jobs=$(shell nproc)
 
-.PHONY:	all clean run
+.PHONY:	all clean run test_%
 
 modules := rnd common # types
 objs := main png_wrap utils
+tests := rnd
 
 CXX = clang++
 CXXFLAGS = -std=c++2c -I$(pdir) -DDEBUG  # -Wall -Wextra -O3 -flto
@@ -15,6 +16,8 @@ LDFLAGS = -std=c++2c # -flto
 bdir := .build
 # project directory
 pdir := mmo
+# tests directory
+tdir := tests
 
 define pcm
 	$(addprefix $(bdir)/,$(addsuffix .pcm,$(1)))
@@ -24,12 +27,23 @@ define obj
 	$(addprefix $(bdir)/,$(addsuffix .o,$(1)))
 endef
 
+define tst
+	$(addprefix $(tdir)/test_,$(addsuffix .cpp,$(1)))
+endef
+
 pcm_modules := $(call pcm,$(modules))
 obj_files := $(call obj,$(objs))
 
 
 all: | $(bdir)/main main
 
+# Tests
+test_%: $(bdir)/test_%
+	./$<
+
+$(bdir)/test_rnd: $(call tst, rnd) $(call pcm,rnd) | $(bdir)
+	$(CXX) $(LDFLAGS) -fprebuilt-module-path=$(bdir)/ -o $@ $^
+	
 # General dependencies
 $(bdir)/main.o: $(pcm_modules)
 
@@ -61,3 +75,6 @@ $(bdir)/%.pcm: $(pdir)/%.cppm | $(bdir)
 $(bdir)/%.o: $(pdir)/%.cpp | $(bdir)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
+# Tests
+# $(bdir)/test_%: $(tdir)/test_%.cpp | $(bdir)
+# 	$(CXX) $(CXXFLAGS) -o $@ $<

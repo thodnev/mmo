@@ -1,11 +1,11 @@
 #include "png_wrap.hpp"
 #include "utils.hpp"
-#include <chrono>
+
 #include <cstdint>
 #include <iostream>
 
 import common;
-import rnd;
+//import rnd;
 //import types;
 
 
@@ -15,21 +15,6 @@ int main(const int argc, char * const argv[])
 
     // types::Stats<uint8_t> stat = {.STR = 2, .AGI = 5};
     // std::cout << stat << std::endl << "Size is: " << sizeof stat << std::endl;
-
-    rnd::RandGenLinux rng(500, "/dev/random");
-    auto maxop = 1e9;
-    unsigned long sum = 0;
-    auto start = std::chrono::high_resolution_clock::now();
-    for (unsigned long long i = 0; i < maxop; i++) {
-        auto result = rng.random(0, 502);
-        //std::cout << result << std::endl;
-        sum += result;
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = end - start;
-
-    std::cout << "TIME: " << 1000 * duration.count() << " ms\tSUM: " << sum << "\n";
-    std::cout << "OPS/s: " << maxop / duration.count() << "\n";
 
     // png_wrap::PngImage img("minimap/test4.png");
     // std::cout << std::format("Image size: {} x {}\n", img.width, img.height);
