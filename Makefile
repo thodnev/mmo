@@ -7,9 +7,9 @@ MAKEFLAGS += --jobs=$(shell nproc)
 modules := rnd common # types
 objs := main png_wrap utils
 
-CXX = clang++ -fno-inline
-CXXFLAGS = -std=c++2c -I$(pdir) -DDEBUG # -Wall -Wextra
-LDFLAGS = -std=c++2c
+CXX = clang++
+CXXFLAGS = -std=c++2c -I$(pdir) -DDEBUG  # -Wall -Wextra -O3 -flto
+LDFLAGS = -std=c++2c # -flto
 
 # build directory
 bdir := .build
@@ -48,7 +48,7 @@ $(bdir):
 	mkdir $@
 
 clean:
-	rm -rf $(bdir)
+	test -n "$(bdir)" && rm -rf "$(bdir)"
 
 main: $(bdir)/main
 

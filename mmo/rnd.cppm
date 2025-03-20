@@ -1,10 +1,12 @@
 module;
+#include "macro.hpp"
 #include <cstdint>
+#include <fstream>
 #include <limits>
 #include <filesystem>
 
 export module rnd;
-namespace rnd {
+export namespace rnd {
 
 template <typename T = unsigned long>
 class RandGenBase {
@@ -16,16 +18,13 @@ public:
     virtual ~RandGenBase() {};
 
     RandGenBase(decltype(update_every) update_every = 64)
-        : update_every(update_every)
-    {
-        update();
-    }
+        : update_every(update_every), update_cnt(update_every) {}
 
     T update()
     {
         update_cnt = 0;
         last ^= random_func();
-        //std::cout << " (UPDATE) ";
+        // LOG("UPDATE");
         return last;
     }
     
@@ -37,7 +36,7 @@ public:
     }
 
 protected:
-    virtual const T random_func();
+    virtual const T random_func() =0;       // abstract method
 
 private:
     T randval()
@@ -58,17 +57,19 @@ class RandGenLinux : public RandGenBase<T>
 {
 public:
     RandGenLinux(decltype(RandGenBase<T>::update_every) update_every = 64,
-                 const std::filesystem::path &randfile = "/dev/urandom")
-        : RandGenBase<T>(update_every)
-    {
-        // @TODO: ...
-    }
+                 const std::filesystem::path &rand_file = "/dev/urandom")
+        : RandGenBase<T>(update_every), rand_stream(rand_file, std::ios::binary) {}
 
 protected:
-    const T random_func() override
+    virtual const T random_func() override
     {
-        // @TODO: ...
+        T ret = 0;
+        rand_stream.read(reinterpret_cast<char *>(&ret), sizeof(ret));
+        return ret;
     };
+
+private:
+    std::ifstream rand_stream;
 };
 
 }   // namespace

@@ -1,15 +1,12 @@
 #include "png_wrap.hpp"
 #include "utils.hpp"
+#include <chrono>
 #include <cstdint>
 #include <iostream>
 
 import common;
 import rnd;
 //import types;
-
-uint8_t rndzero() {
-    return 0;
-}
 
 
 int main(const int argc, char * const argv[])
@@ -19,10 +16,19 @@ int main(const int argc, char * const argv[])
     // types::Stats<uint8_t> stat = {.STR = 2, .AGI = 5};
     // std::cout << stat << std::endl << "Size is: " << sizeof stat << std::endl;
 
-    // common::RandGen<uint8_t> rnd(rndzero, 10);
-    // for (auto i = 0; i < 100; i++) {
-    //     std::cout << i << " : " << (uint32_t)rnd.random(0, 5) << std::endl;
-    // }
+    rnd::RandGenLinux rng(500, "/dev/random");
+    auto maxop = 1e8;
+    unsigned long sum = 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (unsigned long long i = 0; i < maxop; i++) {
+        auto result = rng.random(0, 1000);
+        sum += result;
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+
+    std::cout << "TIME: " << 1000 * duration.count() << " ms\tSUM: " << sum << "\n";
+    std::cout << "OPS/s: " << maxop / duration.count() << "\n";
 
     // png_wrap::PngImage img("minimap/test4.png");
     // std::cout << std::format("Image size: {} x {}\n", img.width, img.height);
@@ -33,9 +39,9 @@ int main(const int argc, char * const argv[])
     // std::cout << "Flat 1s: " << utils::count_bits(flat) << std::endl;
     // std::cout << "DONE" << std::endl;
 
-    common::BinMask mask("minimap/test4.png");
-    std::cout << std::format("Mask size: {} x {}\n", mask.width, mask.height);
-    std::cout << std::format("  set bits: {}\n", mask.num_set_bits());
+    // common::BinMask mask("minimap/test4.png");
+    // std::cout << std::format("Mask size: {} x {}\n", mask.width, mask.height);
+    // std::cout << std::format("  set bits: {}\n", mask.num_set_bits());
 
     // std::cout << "NON-ZERO POINTS:\n";
     // for (size_t bit = 0; bit < mask.num_set_bits(); bit++) {
