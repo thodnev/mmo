@@ -19,12 +19,6 @@ public:
 
     std::vector<uint8_t> flat;
     coord_t width, height;
-    std::variant<
-        std::vector<uint8_t>,
-        std::vector<uint16_t>,
-        std::vector<uint32_t>,
-        std::vector<uint64_t>
-        >   indices_set_bits;
 
     BinMask() : flat(), width(0), height(0) {};
 
@@ -33,11 +27,34 @@ public:
     size_t num_set_bits();
 
     bool get_value(const coord_t x, const coord_t y);
+
+private:
+    void from_png(const std::filesystem::path &file);
+
+};
+
+
+class IndexedBinMask : public BinMask {
+public:
+    std::variant<
+        std::vector<uint8_t>,
+        std::vector<uint16_t>,
+        std::vector<uint32_t>,
+        std::vector<uint64_t>
+        >   indices_set_bits;
+
+    IndexedBinMask() : BinMask() { this->_set_indices(); }
+    IndexedBinMask(const std::filesystem::path &file) : BinMask(file)
+    {
+        this->_set_indices(); 
+    }
+
+    size_t num_set_bits();
+
     // returns coordinates of i-th non-zero element
     std::pair<coord_t, coord_t> get_coords_nonzero(const size_t elnum);
 
 private:
-    void from_png(const std::filesystem::path &file);
     void _set_indices();
 };
 
@@ -48,10 +65,31 @@ void BinMask::from_png(const std::filesystem::path &file)
     this->flat = utils::flatten_bits(img.data, img.width, img.height);
     this->width = img.width;
     this->height = img.height;
-    this->_set_indices();
 }
 
-void BinMask::_set_indices()
+
+
+size_t BinMask::num_set_bits()
+{
+    return utils::count_bits(this->flat);
+}
+
+
+bool BinMask::get_value(const coord_t x, const coord_t y)
+{
+    if ((x >= this->width) || (y >= this->height)) {
+        throw std::out_of_range(std::format(
+            "Coordinates ({}, {}) out of {}x{} size",
+            x, y, this->width, this->height
+            ));
+    }
+
+    size_t idx = y * this->width + x;
+    auto byte = this->flat[idx / 8];
+    return byte & (1 << (7 - (idx % 8)));
+}
+
+void IndexedBinMask::_set_indices()
 {
     //this->num_set_bits = utils::count_bits(this->flat);
 
@@ -82,7 +120,8 @@ void BinMask::_set_indices()
     }
 }
 
-size_t BinMask::num_set_bits()
+
+size_t IndexedBinMask::num_set_bits()
 {
     size_t totalnum;
     std::visit([&totalnum](auto& vec) {
@@ -93,22 +132,7 @@ size_t BinMask::num_set_bits()
 }
 
 
-bool BinMask::get_value(const coord_t x, const coord_t y)
-{
-    if ((x >= this->width) || (y >= this->height)) {
-        throw std::out_of_range(std::format(
-            "Coordinates ({}, {}) out of {}x{} size",
-            x, y, this->width, this->height
-            ));
-    }
-
-    size_t idx = y * this->width + x;
-    auto byte = this->flat[idx / 8];
-    return byte & (1 << (7 - (idx % 8)));
-}
-
-
-std::pair<BinMask::coord_t, BinMask::coord_t> BinMask
+std::pair<IndexedBinMask::coord_t, IndexedBinMask::coord_t> IndexedBinMask
     ::get_coords_nonzero(const size_t elnum)
 {
     auto totalnum = this->num_set_bits();
