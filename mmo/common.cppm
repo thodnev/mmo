@@ -10,8 +10,11 @@ module;
 
 //#include <iostream>
 export module common;
-export namespace common {
 
+import types;
+
+export namespace common {
+    using types::Point;   // Make available in this namespace
 
 class BinMask {
 public:

@@ -4,7 +4,7 @@ MAKEFLAGS += --jobs=$(shell nproc)
 
 .PHONY:	all clean run test_%
 
-modules := rnd common # types
+modules := types common rnd
 objs := main png_wrap utils
 tests := rnd
 
@@ -42,11 +42,13 @@ $(bdir)/test_rnd: $(call tst,rnd) $(call pcm,rnd)
 $(bdir)/test_binmask: LDFLAGS += $(shell pkg-config libpng --libs)
 $(bdir)/test_binmask: $(call tst,binmask) $(call pcm,common) $(call obj,utils)
 
+# Intermodule dependencies
+$(call pcm,common): | $(call pcm,types)
+
 # General dependencies
 $(bdir)/main.o: $(pcm_modules)
-
 $(bdir)/main: CXXFLAGS += -fprebuilt-module-path=$(bdir)/
-$(bdir)/main: LDFLAGS += $(shell pkg-config libpng --libs)
+$(bdir)/main: LDFLAGS += $(shell pkg-config libpng --libs) -fprebuilt-module-path=$(bdir)/
 
 $(bdir)/main: $(obj_files) $(pcm_modules) | $(bdir)
 	$(CXX) $(LDFLAGS) -o $@ $^
