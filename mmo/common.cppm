@@ -23,7 +23,7 @@ public:
     BinMask() : flat(), width(0), height(0) {};
 
     BinMask(const std::filesystem::path &file) { this->from_png(file); }
-    
+
     size_t num_set_bits();
 
     bool get_value(const coord_t x, const coord_t y);
@@ -49,7 +49,7 @@ public:
     IndexedBinMask() : BinMask() { this->_set_indices(); }
     IndexedBinMask(const std::filesystem::path &file) : BinMask(file)
     {
-        this->_set_indices(); 
+        this->_set_indices();
     }
 
     size_t num_set_bits();
@@ -71,7 +71,6 @@ void BinMask::from_png(const std::filesystem::path &file)
 }
 
 
-
 size_t BinMask::num_set_bits()
 {
     return utils::count_bits(this->flat);
@@ -84,7 +83,7 @@ bool BinMask::get_value(const coord_t x, const coord_t y)
         throw std::out_of_range(std::format(
             "Coordinates ({}, {}) out of {}x{} size",
             x, y, this->width, this->height
-            ));
+        ));
     }
 
     size_t idx = y * this->width + x;
@@ -116,7 +115,7 @@ void IndexedBinMask::_set_indices()
         auto idx = 7 - (nbit % 8);
         if (byte & (1 << idx)) {
             // Access the correct vector type using std::visit
-            std::visit([nbit](auto& vec) {
+            std::visit([nbit](auto &vec) {
                 vec.push_back(nbit);
             }, this->indices_set_bits);
         }
@@ -127,7 +126,7 @@ void IndexedBinMask::_set_indices()
 size_t IndexedBinMask::num_set_bits()
 {
     size_t totalnum;
-    std::visit([&totalnum](auto& vec) {
+    std::visit([&totalnum](auto &vec) {
         totalnum = vec.size();
     }, this->indices_set_bits);
 
@@ -143,12 +142,12 @@ std::pair<IndexedBinMask::coord_t, IndexedBinMask::coord_t> IndexedBinMask
     if (elnum >= totalnum) {
         throw std::out_of_range(std::format(
             "Element {} >= {}", elnum, totalnum
-            ));
+        ));
     }
 
     // get index in flat array
     size_t index;
-    std::visit([&index, elnum](auto& vec) {
+    std::visit([&index, elnum](auto &vec) {
         index = vec[elnum];
     }, this->indices_set_bits);
 

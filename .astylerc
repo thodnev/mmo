@@ -1,0 +1,47 @@
+# Config for the AStyle formatter
+# Don't forget to run it with: astyle --project  flag
+
+# Show some more info, it won't hurt
+--verbose
+
+# Do not retain a backup of the original file. We've got git
+--suffix=none
+
+# https://astyle.sourceforge.net/astyle.html#_Brace_Style_Options
+# Based on Linux kernel coding style with some differences
+# The braces are attached except for:
+# the opening brace of a function, class, or namespace
+# Opening braces are broken from namespace, class, and function definitions.
+# The braces are attached to everything else,
+# including arrays, structs, enums, and statements within a function. 
+# The minimum conditional indent is one-half indent.
+--style=linux
+--attach-namespaces
+--attach-classes
+#--attach-inlines
+#--attach-closing-while
+
+# https://astyle.sourceforge.net/astyle.html#_Tab_Options
+# But we indent with 4 spaces, instead of 1TAB=8syms
+--indent=spaces=4
+
+# Nowadays screens are wider. 80 is too small
+--max-code-length=100
+
+# Insert space padding around operators and pad commas.
+# Respect Python PEP8
+--pad-oper     # but it hurts multiline templates
+
+# If is not a function. E.g: if (is_foo) not if(is_foo)
+--pad-header
+
+# Remove >2 empty lines. 2 is difference between classes, as in PEP8
+--squeeze-lines=2
+
+# Pointers belong to var name, not to the type name.
+--align-pointer=name
+# References as well
+--align-reference=name
+
+# Don't break one-line blocks. They are useful when used wisely
+--keep-one-line-blocks
