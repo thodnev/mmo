@@ -9,8 +9,10 @@ objs := main png_wrap utils
 tests := rnd
 
 CXX = clang++
-CXXFLAGS = -std=c++2c -I$(pdir) -DDEBUG  # -Wall -Wextra -O3 -flto
-LDFLAGS = -std=c++2c # -flto
+CXXFLAGS = -std=c++2c -I$(pdir) -fprebuilt-module-path=$(bdir)/
+CXXFLAGS += -DDEBUG  # -Wall -Wextra -O3 -flto
+LDFLAGS = -std=c++2c -fprebuilt-module-path=$(bdir)/ # -flto
+LDLIBS = $(shell pkg-config libpng --libs)
 
 # build directory
 bdir := .build
@@ -39,7 +41,6 @@ all: | $(bdir)/main main
 
 # Test dependencies
 $(bdir)/test_rnd: $(call tst,rnd) $(call pcm,rnd)
-$(bdir)/test_binmask: LDFLAGS += $(shell pkg-config libpng --libs)
 $(bdir)/test_binmask: $(call tst,binmask) $(call pcm,common) $(call obj,utils)
 
 # Intermodule dependencies
@@ -47,11 +48,10 @@ $(call pcm,common): | $(call pcm,types)
 
 # General dependencies
 $(bdir)/main.o: $(pcm_modules)
-$(bdir)/main: CXXFLAGS += -fprebuilt-module-path=$(bdir)/
-$(bdir)/main: LDFLAGS += $(shell pkg-config libpng --libs) -fprebuilt-module-path=$(bdir)/
+$(bdir)/main: LDFLAGS += 
 
 $(bdir)/main: $(obj_files) $(pcm_modules) | $(bdir)
-	$(CXX) $(LDFLAGS) -o $@ $^
+	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
 
 $(bdir)/png_wrap.o: CXXFLAGS += $(shell pkg-config libpng --cflags)
 #$(bdir)/png_wrap: LDFLAGS += $(shell pkg-config libpng --libs)
@@ -77,7 +77,7 @@ $(bdir)/%.o: $(pdir)/%.cpp | $(bdir)
 
 # Tests
 $(bdir)/test_%: $(call tst, %) | $(bdir)
-	$(CXX) $(LDFLAGS) -fprebuilt-module-path=$(bdir)/ -o $@ $^
+	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
 
 test_%: $(bdir)/test_%
 	./$<	

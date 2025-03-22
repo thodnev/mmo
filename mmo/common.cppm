@@ -14,14 +14,14 @@ export module common;
 import types;
 
 export namespace common {
-    using types::Point;   // Make available in this namespace
+    using types::Coord;   // Make available in this namespace
 
+
+template <typename T = unsigned long>
 class BinMask {
 public:
-    using coord_t = unsigned long;
-
     std::vector<uint8_t> flat;
-    coord_t width, height;
+    T width, height;
 
     BinMask() : flat(), width(0), height(0) {};
 
@@ -29,7 +29,7 @@ public:
 
     size_t num_set_bits();
 
-    bool get_value(const coord_t x, const coord_t y);
+    bool get_value(const T x, const T y);
 
 private:
     void from_png(const std::filesystem::path &file);
@@ -37,7 +37,8 @@ private:
 };
 
 
-class IndexedBinMask : public BinMask {
+template <typename T = unsigned long>
+class IndexedBinMask : public BinMask<T> {
 public:
     std::variant<
         //std::monostate,     // prevent default initialization of vectors
@@ -49,8 +50,8 @@ public:
 
     // @TODO: combine constructors into one
     //        using const std::filesystem::path &file = {}
-    IndexedBinMask() : BinMask() { this->_set_indices(); }
-    IndexedBinMask(const std::filesystem::path &file) : BinMask(file)
+    IndexedBinMask() : BinMask<T>() { this->_set_indices(); }
+    IndexedBinMask(const std::filesystem::path &file) : BinMask<T>(file)
     {
         this->_set_indices();
     }
@@ -58,14 +59,15 @@ public:
     size_t num_set_bits();
 
     // returns coordinates of i-th non-zero element
-    std::pair<coord_t, coord_t> get_coords_nonzero(const size_t elnum);
+    Coord<T> get_coord_nonzero(const size_t elnum);
 
 private:
     void _set_indices();
 };
 
 
-void BinMask::from_png(const std::filesystem::path &file)
+template <typename T>
+void BinMask<T>::from_png(const std::filesystem::path &file)
 {
     png_wrap::PngImage img(file);
     this->flat = utils::flatten_bits(img.data, img.width, img.height);
@@ -74,13 +76,15 @@ void BinMask::from_png(const std::filesystem::path &file)
 }
 
 
-size_t BinMask::num_set_bits()
+template <typename T>
+size_t BinMask<T>::num_set_bits()
 {
     return utils::count_bits(this->flat);
 }
 
 
-bool BinMask::get_value(const coord_t x, const coord_t y)
+template <typename T>
+bool BinMask<T>::get_value(const T x, const T y)
 {
     if ((x >= this->width) || (y >= this->height)) {
         throw std::out_of_range(std::format(
@@ -94,7 +98,8 @@ bool BinMask::get_value(const coord_t x, const coord_t y)
     return byte & (1 << (7 - (idx % 8)));
 }
 
-void IndexedBinMask::_set_indices()
+template <typename T>
+void IndexedBinMask<T>::_set_indices()
 {
     //this->num_set_bits = utils::count_bits(this->flat);
 
@@ -126,7 +131,8 @@ void IndexedBinMask::_set_indices()
 }
 
 
-size_t IndexedBinMask::num_set_bits()
+template <typename T>
+size_t IndexedBinMask<T>::num_set_bits()
 {
     size_t totalnum;
     std::visit([&totalnum](auto &vec) {
@@ -137,8 +143,8 @@ size_t IndexedBinMask::num_set_bits()
 }
 
 
-std::pair<IndexedBinMask::coord_t, IndexedBinMask::coord_t> IndexedBinMask
-    ::get_coords_nonzero(const size_t elnum)
+template <typename T>
+Coord<T> IndexedBinMask<T>::get_coord_nonzero(const size_t elnum)
 {
     auto totalnum = this->num_set_bits();
 

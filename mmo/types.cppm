@@ -83,11 +83,11 @@ struct Stats
 
 
 template<typename T>
-struct Point {
+struct Coord {
     T x;
     T y;
 
-    Point(T x, T y) : x(x), y(y) {}
+    Coord(T x, T y) : x(x), y(y) {}
 };
 
 }       // namespace types
@@ -99,21 +99,21 @@ export namespace std {
 // Specialization of std::tuple_size
 // Declares that Point<T> behaves like a tuple with 2 elements (x and y).
 template <typename T>
-struct tuple_size<types::Point<T>> : std::integral_constant<std::size_t, 2> {};
+struct tuple_size<types::Coord<T>> : std::integral_constant<std::size_t, 2> {};
 
 // Specialization of std::tuple_element
 // Defines the type of each element in Point<T>, making Point behave like a tuple.
 
 template <typename T, std::size_t I>
-struct tuple_element<I, types::Point<T>> {
+struct tuple_element<I, types::Coord<T>> {
     // or .y, both are the same type
-    using type = decltype(std::declval<types::Point<T>>().x);
+    using type = decltype(std::declval<types::Coord<T>>().x);
 };
 
 // Overload of std::get
 // Provides a way to access elements using std::get<I>(point)
 template <typename T, std::size_t I>
-constexpr auto get(const types::Point<T> &obj) -> decltype(auto)
+constexpr auto get(const types::Coord<T> &obj) -> decltype(auto)
 {
     if constexpr (I == 0) {
         return obj.x;
