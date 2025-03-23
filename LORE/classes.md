@@ -11,6 +11,18 @@
   Alt-terms:
   - Enchanter
 
+- Trickster [INS + LUK]. Combines Insanity with some Luck.
+  
+  Profits from having high Insanity stats.
+  Counters some side-effects of it using passive (and active) skills.
+
+  Other names (2nd class ??):
+  - Loki
+  - Joker / Jester / Droll / Montley
+  - Juggler
+  - Illusionist
+
+- 
 
 ## Other terms
 
@@ -25,11 +37,26 @@
   But Witch / Witcher gives too many references.
 - Exorcist.
 
-- Occultist
-- Marxist. Why not.
 - Gnostic
+- Occultist
+
+- Marxist. Why not.
+
+- Adept
+- Phanatic
 
 - Reaper
+
+## Cool Magic-related words
+- Goetia
+- Grimoire
+- Low magic / Witchcraft
+- Necromancy
+- Warlock
+- Demonolog
+- Blasphemer
+
+(use of [Sigils](https://en.wikipedia.org/wiki/Sigil))
 
 
 ## For future
