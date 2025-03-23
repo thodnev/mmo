@@ -10,8 +10,7 @@ export module types;
 export namespace types {
 
 template <typename T = uint8_t>
-struct Stats
-{
+struct Stats {
     T STR = 0;       // Strength
     T INT = 0;       // Intelligence
     T DEX = 0;       // Dexterity
@@ -25,14 +24,12 @@ struct Stats
 
     std::vector<T> to_vector() const {
         return {
-            this->STR, this->INT, this->DEX, this->CON, 
+            this->STR, this->INT, this->DEX, this->CON,
             this->WIS, this->AGI, this->LUK, this->INS
         };
     }
 
-    operator std::vector<T>() const {
-        return this->to_vector();
-    }
+    operator std::vector<T>() const { return this->to_vector(); }
 
     std::vector<std::pair<std::string, T>> to_pairs() const {
         const std::string names[] = { "STR", "INT", "DEX", "CON", "WIS", "AGI", "LUK", "INS" };
@@ -89,6 +86,9 @@ struct Coord {
 
     Coord(T x, T y) : x(x), y(y) {}
 };
+
+
+
 
 }       // namespace types
 

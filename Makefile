@@ -40,8 +40,9 @@ obj_files := $(call obj,$(objs))
 all: | $(bdir)/main main
 
 # Test dependencies
-$(bdir)/test_rnd: $(call tst,rnd) $(call pcm,rnd)
-$(bdir)/test_binmask: $(call tst,binmask) $(call pcm,common) $(call obj,utils)
+$(bdir)/test_path: $(call obj,utils) # $(call pcm,types)
+$(bdir)/test_rnd: $(call pcm,rnd)
+$(bdir)/test_binmask: $(call pcm,common) $(call obj,utils)
 
 # Intermodule dependencies
 $(call pcm,common): | $(call pcm,types)
@@ -80,4 +81,5 @@ $(bdir)/test_%: $(call tst, %) | $(bdir)
 	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
 
 test_%: $(bdir)/test_%
-	./$<	
+	@echo -n "Running "
+	$<	
