@@ -1,12 +1,29 @@
 module;     // Global module fragment
+#include <array>
+#include <bitset>
 #include <cstdint>
+#include <exception>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
+
 export module types;
+
+/// Coordinate delta constraint
+/// Here we check that the type is integer and CAN HOLD values from -1 to 1.
+/// (does not mean it holds, this why we need runtime check as well)
+template <typename T>
+concept pe_coord_constraint = (
+    std::is_integral<T>::value && std::is_signed<T>::value
+    && (-1 <= T{} && T{} <= 1)
+);
+
+
 export namespace types {
 
 template <typename T = uint8_t>
@@ -79,6 +96,73 @@ struct Stats {
 };
 
 
+struct PathEntry {
+    public:
+        static constexpr size_t bitlen = 3;
+    private:
+        using delta_t = int8_t;     // For coordinate delta, e.g. (-1, 1)
+        using pair_t = std::tuple<delta_t, delta_t>;
+        using bset_t = std::bitset<bitlen>;
+        //  b2 | b1 | b0
+        //  r  | q  | p
+        uint8_t data : bitlen;  ///< use bitfield, std::bitset uses 64 bits
+    
+        /// LUT for converting bits to (dX, dY) coordinate deltas
+        /// Coordinates are indexed as:
+        /// index = ((dY + 1) * 3 + dX + 5) % 9
+        /// except (0, 0) -- produces 8 -- forbidden combination
+        static constexpr std::array<pair_t, (1 << bitlen)>
+            _table_data_to_coords = {
+                //                          rqp      (dX, dY)
+                pair_t{ 1,  0},  // [0] = 0b000  ->  ( 1,  0)
+                pair_t{-1,  1},  // [1] = 0b001  ->  (-1,  1)
+                pair_t{ 0,  1},  // [2] = 0b010  ->  ( 0,  1)
+                pair_t{ 1,  1},  // [3] = 0b011  ->  ( 1,  1)
+                pair_t{-1, -1},  // [4] = 0b100  ->  (-1, -1)
+                pair_t{ 0, -1},  // [5] = 0b101  ->  ( 0, -1)
+                pair_t{ 1, -1},  // [6] = 0b110  ->  ( 1, -1)
+                pair_t{-1,  0}   // [7] = 0b111  ->  (-1,  0)
+        };
+    
+    public:
+        PathEntry() = delete;       ///< prevent default constructor
+    
+        constexpr PathEntry(const bset_t bits) noexcept
+                  : data(bits.to_ulong()) {}
+    
+        constexpr PathEntry(const auto dX, const auto dY)
+                  : data(dxdy_to_bitset(dX, dY).to_ulong()) {}
+    
+        constexpr auto to_coords() noexcept
+        {
+            return _table_data_to_coords[data];
+        }
+    
+        constexpr bset_t to_bitset() noexcept
+        {
+            return bset_t(data);
+        }
+    
+        template<typename T>
+        requires pe_coord_constraint<T>
+        static constexpr bset_t dxdy_to_bitset(const T dX, const T dY)
+        {
+            [[unlikely]] if (
+                    dX < -1 || dY < -1 || dX > 1 || dY > 1
+                    || (dX == 0 && dY == 0)) {
+                throw std::out_of_range(
+                    "(dX, dY) must be in range [-1, 1] and cannot be (0, 0)"
+                );
+            }
+            // Coordinates are indexed as:
+            // data = index = ((dY + 1) * 3 + dX + 5) % 9
+            // except (0, 0) -- produces 8 -- forbidden combination
+            // This way no inverse LUT is needed, just compute the index
+            return ( ((int)dY + 1) * 3 + ((int)dX + 5) ) % 9;
+        }
+};
+
+
 template<typename T>
 struct Coord {
     T x;
@@ -86,10 +170,6 @@ struct Coord {
 
     Coord(T x, T y) : x(x), y(y) {}
 };
-
-
-
-
 }       // namespace types
 
 
