@@ -97,78 +97,176 @@ struct Stats {
 
 
 struct PathEntry {
-    public:
-        static constexpr size_t bitlen = 3;
-    private:
-        using delta_t = int8_t;     // For coordinate delta, e.g. (-1, 1)
-        using pair_t = std::tuple<delta_t, delta_t>;
-        using bset_t = std::bitset<bitlen>;
-        //  b2 | b1 | b0
-        //  r  | q  | p
-        uint8_t data : bitlen;  ///< use bitfield, std::bitset uses 64 bits
-    
-        /// LUT for converting bits to (dX, dY) coordinate deltas
-        /// Coordinates are indexed as:
-        /// index = ((dY + 1) * 3 + dX + 5) % 9
-        /// except (0, 0) -- produces 8 -- forbidden combination
-        static constexpr std::array<pair_t, (1 << bitlen)>
-            _table_data_to_coords = {
-                //                          rqp      (dX, dY)
-                pair_t{ 1,  0},  // [0] = 0b000  ->  ( 1,  0)
-                pair_t{-1,  1},  // [1] = 0b001  ->  (-1,  1)
-                pair_t{ 0,  1},  // [2] = 0b010  ->  ( 0,  1)
-                pair_t{ 1,  1},  // [3] = 0b011  ->  ( 1,  1)
-                pair_t{-1, -1},  // [4] = 0b100  ->  (-1, -1)
-                pair_t{ 0, -1},  // [5] = 0b101  ->  ( 0, -1)
-                pair_t{ 1, -1},  // [6] = 0b110  ->  ( 1, -1)
-                pair_t{-1,  0}   // [7] = 0b111  ->  (-1,  0)
-        };
-    
-    public:
-        PathEntry() = delete;       ///< prevent default constructor
-    
-        constexpr PathEntry(const bset_t bits) noexcept
-                  : data(bits.to_ulong()) {}
-    
-        constexpr PathEntry(const auto dX, const auto dY)
-                  : data(dxdy_to_bitset(dX, dY).to_ulong()) {}
-    
-        constexpr auto to_coords() noexcept
-        {
-            return _table_data_to_coords[data];
+public:
+    static constexpr size_t bitlen = 3;
+private:
+    using delta_t = int8_t;     // For coordinate delta, e.g. (-1, 1)
+public:
+    using pair_t = std::tuple<delta_t, delta_t>;
+private:
+    using bset_t = std::bitset<bitlen>;
+    //  b2 | b1 | b0
+    //  r  | q  | p
+    uint8_t data : bitlen;  ///< use bitfield, std::bitset uses 64 bits
+
+    /// LUT for converting bits to (dX, dY) coordinate deltas
+    /// Coordinates are indexed as:
+    /// index = ((dY + 1) * 3 + dX + 5) % 9
+    /// except (0, 0) -- produces 8 -- forbidden combination
+    static constexpr std::array<pair_t, (1 << bitlen)>
+        _table_data_to_coords = {
+            //                          rqp      (dX, dY)
+            pair_t{ 1,  0},  // [0] = 0b000  ->  ( 1,  0)
+            pair_t{-1,  1},  // [1] = 0b001  ->  (-1,  1)
+            pair_t{ 0,  1},  // [2] = 0b010  ->  ( 0,  1)
+            pair_t{ 1,  1},  // [3] = 0b011  ->  ( 1,  1)
+            pair_t{-1, -1},  // [4] = 0b100  ->  (-1, -1)
+            pair_t{ 0, -1},  // [5] = 0b101  ->  ( 0, -1)
+            pair_t{ 1, -1},  // [6] = 0b110  ->  ( 1, -1)
+            pair_t{-1,  0}   // [7] = 0b111  ->  (-1,  0)
+    };
+
+    template<typename T>
+    requires pe_coord_constraint<T>
+    static constexpr auto _dxdy_to_index(const T dX, const T dY) noexcept
+    {
+        // Coordinates are indexed as:
+        // data = index = ((dY + 1) * 3 + dX + 5) % 9
+        // except (0, 0) -- produces 8 -- forbidden combination
+        // This way no inverse LUT is needed, just compute the index
+        return ( ((int)dY + 1) * 3 + ((int)dX + 5) ) % 9;
+    }
+
+public:
+    PathEntry() = delete;       ///< prevent default constructor
+
+    constexpr PathEntry(const bset_t bits) noexcept
+                : data(bits.to_ulong()) {}
+
+    constexpr PathEntry(const auto dX, const auto dY)
+                : data(dxdy_to_bitset(dX, dY).to_ulong()) {}
+
+    constexpr auto to_coords() const noexcept
+    {
+        return _table_data_to_coords[data];
+    }
+
+    constexpr bset_t to_bitset() const noexcept
+    {
+        return bset_t(data);
+    }
+
+    template<typename T>
+    requires pe_coord_constraint<T>
+    static bset_t dxdy_to_bitset(const T dX, const T dY)
+    {
+        // constexpr bool is_valid = (dX >= -1 && dY >= -1 && dX <= 1 && dY <= 1
+        //                            && !(dX == 0 && dY == 0));
+        // static_assert(is_valid, "(dX, dY) must be in range [-1, 1] and cannot be (0, 0)");
+        
+        [[unlikely]] if (dX < -1 || dY < -1 || dX > 1 || dY > 1
+                         || (dX == 0 && dY == 0)) {
+            throw std::out_of_range(
+                "(dX, dY) must be in range [-1, 1] and cannot be (0, 0)");
         }
-    
-        constexpr bset_t to_bitset() noexcept
-        {
-            return bset_t(data);
-        }
-    
-        template<typename T>
-        requires pe_coord_constraint<T>
-        static constexpr bset_t dxdy_to_bitset(const T dX, const T dY)
-        {
-            [[unlikely]] if (
-                    dX < -1 || dY < -1 || dX > 1 || dY > 1
-                    || (dX == 0 && dY == 0)) {
-                throw std::out_of_range(
-                    "(dX, dY) must be in range [-1, 1] and cannot be (0, 0)"
-                );
-            }
-            // Coordinates are indexed as:
-            // data = index = ((dY + 1) * 3 + dX + 5) % 9
-            // except (0, 0) -- produces 8 -- forbidden combination
-            // This way no inverse LUT is needed, just compute the index
-            return ( ((int)dY + 1) * 3 + ((int)dX + 5) ) % 9;
-        }
+
+        return bset_t(_dxdy_to_index(dX, dY));
+    }
+
+    operator std::string() const {
+        const auto [dX, dY] = to_coords();
+        return std::format("PE({:>2}, {:>2})", dX, dY);
+    }
+
+    constexpr friend std::ostream& operator<<(std::ostream &os, const PathEntry &pe)
+    {
+        return os << static_cast<std::string>(pe);
+    }
 };
 
 
-template<typename T>
-struct Coord {
+// @TODO: change inheritance to composition to ensure there will be no surprises
+//
+/// Path works as std::vector containing PathEntry, but internally
+/// stores them in reverse order to ensure cheap pops from the head.
+/// PEs must be located from last to first, as std::vector is cheap to pop
+/// from the tail, and expensive to pop from the head.
+class Path : public std::vector<PathEntry> {
+private:
+    using vec_t = std::vector<PathEntry>;
+
+public:
+    // constexpr coord_t from_point(const coord_t start) noexcept
+    // {
+    //     // ...
+    //     return {0, 0};
+    // }
+
+    // Custom constructor to initialize in reverse order
+    Path(std::initializer_list<PathEntry> items) 
+        : vec_t(std::rbegin(items),
+                std::rend(items)) {}
+    //Path(const vec_t &vec) : vec_t(vec.rbegin(), vec.rend()) {}
+        
+    template<typename inp_iter>
+    Path(inp_iter first, inp_iter last)
+        : vec_t(std::reverse_iterator(last),
+                std::reverse_iterator(first)) {}
+
+    // Override operator[] to access elements in reverse order
+    constexpr const PathEntry& operator[](size_t index) const {
+        return vec_t::operator[](this->size() - 1 - index);
+    }
+
+    // Provide a reverse iterator as default
+    constexpr auto begin() const { return vec_t::rbegin(); }
+    constexpr auto end() const { return vec_t::rend(); }
+    constexpr auto rbegin() const { return vec_t::begin(); }
+    constexpr auto rend()const { return vec_t::end(); }
+
+    constexpr auto pop_next()
+    {
+        if (this->empty()) {
+            throw std::out_of_range("Cannot pop from empty Path");
+        }
+        auto el = this->back();     // get element
+        this->pop_back();           // remove from the vector
+        return el;
+    }
+
+    constexpr auto pop_delta() noexcept
+    {
+        try {
+            auto el = this->pop_next();
+            return el.to_coords();
+        } catch (const std::out_of_range &exc) {
+            return PathEntry::pair_t{0, 0};
+        } 
+    }
+};
+
+
+template<typename T = int16_t>
+struct [[gnu::packed]] Coord {
     T x;
     T y;
 
-    Coord(T x, T y) : x(x), y(y) {}
+    Coord(const T x, const T y) : x(x), y(y) {}
+
+    /// Distance metric based on octile distance
+    /// Octile distance is computed as:
+    /// dst = max(Δx, Δy) + (√2​−1)⋅min(Δx,Δy)
+    /// We approximate with integer arithmetic as:
+    /// dst*128 = 128 * max(Δx, Δy) + 53 * min(Δx,Δy)
+    /// Should give us 0.03% error
+    constexpr unsigned long dist_metric(const Coord &other) noexcept
+    {
+        unsigned long dx = std::abs((long)this->x - (long)other->x);
+        unsigned long dy = std::abs((long)this->y - (long)other->y);
+
+        auto dst = 128 * std::max(dx, dy) + 53 * std::min(dx, dy);
+        return dst;
+    }
 };
 }       // namespace types
 

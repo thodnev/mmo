@@ -1,11 +1,14 @@
-#include <iostream>
+#include <stdexcept>
+#include <type_traits>
+#include <vector>
 
 import types;
+using namespace types;
 
+#include <iostream>
 #include <bitset>
 #include <exception>
 #include <format>
-#include <vector>
 
 int main(const int argc, char * const argv[])
 {
@@ -53,6 +56,28 @@ int main(const int argc, char * const argv[])
         std::cout << "caught " << exc.what() << std::endl;
     }
     std::cout << "\nThat's all\n";
+
+    // Path
+    Path pth = {
+        PathEntry{-1, -1},          // element [0] stored at tail
+        PathEntry{1, 0},
+        PathEntry{0, 1},
+        PathEntry{1, 1}
+    };
+    
+    std::cout << "Elements in reverse order: ";
+    for (const auto& el : pth) {
+        std::cout << el << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "Access via operator[]: ";
+    for (size_t i = 0; i < pth.size(); ++i) {
+        std::cout << pth[i] << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "LAST stored:" << pth.pop_next() << "\n";
 
     return 0;
 }

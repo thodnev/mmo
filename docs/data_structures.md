@@ -64,4 +64,7 @@ Which gives the following movements translation (coordinates start as usual, in 
 ```
 
 
+## Distance finding
 
+* Use octile distance metric
+* Use A* algorithm
