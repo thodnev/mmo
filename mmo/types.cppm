@@ -252,6 +252,32 @@ struct [[gnu::packed]] Coord {
     T y;
 
     Coord(const T x, const T y) : x(x), y(y) {}
+    
+    // TODO: fix conversions
+    template<typename P>
+    Coord(const std::pair<P, P> &pair) : Coord(pair.first, pair.second) {}
+
+    constexpr size_t hash() const noexcept
+    {
+        // std::hash-like must return size_t,
+        // for ints it usually returns the numbers itself
+        // That is why, rotate by half of size_t while combining them
+        auto hx = std::hash<decltype(x)>{}(x);
+        auto hy = std::hash<decltype(y)>{}(y);
+        // rotate by half
+        constexpr const auto rot = sizeof(size_t) * 4;
+        return ((hx << rot) | (hx >> rot)) ^ hy;
+    }
+
+    template<typename U = T>
+    bool operator==(const Coord<U> &other) const {
+        return (x == other.x) && (y == other.y);
+    }
+
+    operator std::string() const noexcept
+    {
+        return std::format("({}, {})", x, y);
+    }
 
     /// Distance metric based on octile distance
     /// Octile distance is computed as:
@@ -282,7 +308,7 @@ struct tuple_size<types::Coord<T>> : std::integral_constant<std::size_t, 2> {};
 // Specialization of std::tuple_element
 // Defines the type of each element in Point<T>, making Point behave like a tuple.
 
-template <typename T, std::size_t I>
+template<typename T, std::size_t I>
 struct tuple_element<I, types::Coord<T>> {
     // or .y, both are the same type
     using type = decltype(std::declval<types::Coord<T>>().x);
@@ -290,7 +316,7 @@ struct tuple_element<I, types::Coord<T>> {
 
 // Overload of std::get
 // Provides a way to access elements using std::get<I>(point)
-template <typename T, std::size_t I>
+template<typename T, std::size_t I>
 constexpr auto get(const types::Coord<T> &obj) -> decltype(auto)
 {
     if constexpr (I == 0) {
@@ -299,4 +325,14 @@ constexpr auto get(const types::Coord<T> &obj) -> decltype(auto)
         return obj.y;
     }
 }
+
+// Custom specialization of std::hash
+template<typename T>
+struct hash<types::Coord<T>>
+{
+    size_t operator()(const types::Coord<T> &coord) const noexcept
+    {
+        return coord.hash();    // delegate to own method
+    }
+};
 };   // namespace std

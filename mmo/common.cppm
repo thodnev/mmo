@@ -29,7 +29,7 @@ public:
 
     size_t num_set_bits();
 
-    bool get_value(const T x, const T y);
+    bool get_value(const T x, const T y) const;
 
 private:
     void from_png(const std::filesystem::path &file);
@@ -84,7 +84,7 @@ size_t BinMask<T>::num_set_bits()
 
 
 template <typename T>
-bool BinMask<T>::get_value(const T x, const T y)
+bool BinMask<T>::get_value(const T x, const T y) const
 {
     if ((x >= this->width) || (y >= this->height)) {
         throw std::out_of_range(std::format(
