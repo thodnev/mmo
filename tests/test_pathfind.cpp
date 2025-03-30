@@ -1,8 +1,14 @@
+#include <cmath>
+#include <compare>
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
+#include <queue>
+#include <vector>
 
 import types;
 import common;
@@ -50,7 +56,74 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
         ));
     }
 
-    std::unordered_set<Coord<U>> visited = {from}; 
+    // Coord::dist_metric return type
+    using dist_t = std::invoke_result_t<
+        decltype(&Coord<U>::dist_metric), Coord<U>,
+        const Coord<U>&>;
+    
+    // This stores our evaluated paths
+    struct PathDist {
+        dist_t dist;
+        Coord<U> last_coord;
+        std::vector<PathEntry> path;
+    };
+
+    // moving steps, all possible combinations
+    const auto steps = PathEntry::get_steps_table();
+
+    class HeapCmp {
+        Coord<U> endpoint;
+
+        bool operator()( const PathDist &lhs, const PathDist &rhs ) const
+        {
+            auto cur = lhs.dist + lhs.last_coord.dist_metric(endpoint);
+            auto oth = rhs.dist + rhs.last_coord.dist_metric(endpoint);
+            return lhs > rhs;
+        }
+    };
+    
+    // heap queue with .top() always returning the PathDist with smallest distance
+    std::priority_queue<PathDist, std::vector<PathDist>, HeapCmp(to)>
+        heapq;
+    
+    heapq.emplace(PathDist{.dist = 0, .last_coord = from, .path = {}});
+
+    // stored coords we already visited
+    std::unordered_set<Coord<U>> visited;
+
+    // traverse the map
+    while (! heapq.empty()) {
+        auto pd = heapq.top();
+
+        // when node is the goal, return the found path
+        if (pd.last_coord == to) return pd.path;
+
+        // move the node to visited
+        visited.emplace(pd.last_coord);
+        heapq.pop();
+
+        // for each neighbor of the current node
+        for (const auto &[dx, dy]: steps) {
+            Coord<U> newstep = {pd.last_coord.x + dx, pd.last_coord.y + dy};
+            
+            // ensure we can go here
+            if (!is_on_map(newstep) || is_forbidden(newstep))  continue;
+            
+            // path up to the prev point + from prev point to current
+            dist_t newdist = pd.dist + pd.last_coord.dist_metric(newstep);
+
+            // TODO: check that new distance is shorter than in visited
+
+            // if neighbor is not in heapq, add it
+            if (visited.contains(newstep))  continue;
+
+            std::vector<PathEntry> newpath = pd.path;
+            newpath.push_back(PathEntry(dx, dy));
+            PathDist newel = {.dist = newdist, .last_coord = newstep, .path = newpath};
+            heapq.emplace(newel);
+        }
+    }
+    std::cout << "FINISH TRAVERSAL\n";
 }
 
 int main(const int argc, char * const argv[])

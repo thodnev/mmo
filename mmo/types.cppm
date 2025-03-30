@@ -103,6 +103,7 @@ private:
     using delta_t = int8_t;     // For coordinate delta, e.g. (-1, 1)
 public:
     using pair_t = std::tuple<delta_t, delta_t>;
+    using table_arr_t = std::array<pair_t, (1 << bitlen)>;
 private:
     using bset_t = std::bitset<bitlen>;
     //  b2 | b1 | b0
@@ -113,7 +114,7 @@ private:
     /// Coordinates are indexed as:
     /// index = ((dY + 1) * 3 + dX + 5) % 9
     /// except (0, 0) -- produces 8 -- forbidden combination
-    static constexpr std::array<pair_t, (1 << bitlen)>
+    static constexpr const table_arr_t
         _table_data_to_coords = {
             //                          rqp      (dX, dY)
             pair_t{ 1,  0},  // [0] = 0b000  ->  ( 1,  0)
@@ -150,6 +151,8 @@ public:
     {
         return _table_data_to_coords[data];
     }
+
+    static constexpr const table_arr_t &get_steps_table() { return _table_data_to_coords; }
 
     constexpr bset_t to_bitset() const noexcept
     {
@@ -270,7 +273,7 @@ struct [[gnu::packed]] Coord {
     }
 
     template<typename U = T>
-    bool operator==(const Coord<U> &other) const {
+    bool operator==(const Coord<U> &other) const noexcept {
         return (x == other.x) && (y == other.y);
     }
 
@@ -285,10 +288,10 @@ struct [[gnu::packed]] Coord {
     /// We approximate with integer arithmetic as:
     /// dst*128 = 128 * max(Δx, Δy) + 53 * min(Δx,Δy)
     /// Should give us 0.03% error
-    constexpr unsigned long dist_metric(const Coord &other) noexcept
+    constexpr unsigned long dist_metric(const Coord &other) const noexcept
     {
-        unsigned long dx = std::abs((long)this->x - (long)other->x);
-        unsigned long dy = std::abs((long)this->y - (long)other->y);
+        unsigned long dx = std::abs((long)this->x - (long)other.x);
+        unsigned long dy = std::abs((long)this->y - (long)other.y);
 
         auto dst = 128 * std::max(dx, dy) + 53 * std::min(dx, dy);
         return dst;
