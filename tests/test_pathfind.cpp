@@ -157,10 +157,10 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
 template<typename U>
 void mapout(const BinMask<U> &mask)
 {
-    for (size_t x = 0; x < mask.width; x++) {
-        for (size_t y = 0; y < mask.height; y++) {
+    for (size_t y = 0; y < mask.height; y++) {
+        for (size_t x = 0; x < mask.width; x++) {
             auto val = mask.get_value(x, y);
-            std::cout << (val ? "**" : "  ");
+            std::cout << (val ? "  " : "##");
         }
         std::cout << std::endl;
     }
@@ -172,9 +172,7 @@ int main(const int argc, char * const argv[])
 
     // Load test map
     BinMask mask("IDEAS/testmap_small.png");
-
-    // @!!! BUG: messy image read
-    mapout(mask);
+    //mapout(mask);
 
     std::pair from = {79, 145},
               to   = {69, 110};
