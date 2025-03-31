@@ -11,7 +11,6 @@ module;     // Global module fragment
 #include <utility>
 #include <vector>
 
-
 export module types;
 
 /// Coordinate delta constraint
@@ -294,6 +293,7 @@ struct [[gnu::packed]] Coord {
         unsigned long dy = std::abs((long)this->y - (long)other.y);
 
         auto dst = 128 * std::max(dx, dy) + 53 * std::min(dx, dy);
+        // auto dst = dx + dy;
         return dst;
     }
 };
