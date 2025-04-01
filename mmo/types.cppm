@@ -103,18 +103,13 @@ private:
 public:
     using pair_t = std::tuple<delta_t, delta_t>;
     using table_arr_t = std::array<pair_t, (1 << bitlen)>;
-private:
-    using bset_t = std::bitset<bitlen>;
-    //  b2 | b1 | b0
-    //  r  | q  | p
-    uint8_t data : bitlen;  ///< use bitfield, std::bitset uses 64 bits
 
     /// LUT for converting bits to (dX, dY) coordinate deltas
     /// Coordinates are indexed as:
     /// index = ((dY + 1) * 3 + dX + 5) % 9
     /// except (0, 0) -- produces 8 -- forbidden combination
     static constexpr const table_arr_t
-        _table_data_to_coords = {
+        _steps_table = {
             //                          rqp      (dX, dY)
             pair_t{ 1,  0},  // [0] = 0b000  ->  ( 1,  0)
             pair_t{-1,  1},  // [1] = 0b001  ->  (-1,  1)
@@ -125,6 +120,11 @@ private:
             pair_t{ 1, -1},  // [6] = 0b110  ->  ( 1, -1)
             pair_t{-1,  0}   // [7] = 0b111  ->  (-1,  0)
     };
+private:
+    using bset_t = std::bitset<bitlen>;
+    //  b2 | b1 | b0
+    //  r  | q  | p
+    uint8_t data : bitlen;  ///< use bitfield, std::bitset uses 64 bits
 
     template<typename T>
     requires pe_coord_constraint<T>
@@ -148,10 +148,10 @@ public:
 
     constexpr auto to_coords() const noexcept
     {
-        return _table_data_to_coords[data];
+        return _steps_table[data];
     }
 
-    static constexpr const table_arr_t &get_steps_table() { return _table_data_to_coords; }
+    //static constexpr const table_arr_t &get_steps_table() { return _steps_table; }
 
     constexpr bset_t to_bitset() const noexcept
     {

@@ -29,11 +29,11 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
         std::cerr << "Pure distance: " << from.dist_metric(to) << std::endl;
 
     // @TODO: make it Coord methods
-    auto is_on_map = [&](const Coord<U> &coord) constexpr {
+    auto is_on_map = [&map](const Coord<U> &coord) constexpr {
             return coord.x < map.width && coord.y < map.height && coord.x >= 0 && coord.y >= 0;
     };
 
-    auto ensure_on_map = [&](const Coord<U> &coord) constexpr {
+    auto ensure_on_map = [&map, &is_on_map](const Coord<U> &coord) constexpr {
         if (! is_on_map(coord)) {
             throw std::range_error(std::format(
                 "Coord {} does not belong to map {}x{}",
@@ -41,7 +41,7 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
         }
     };
 
-    auto is_forbidden = [&](const Coord<U> &coord) constexpr {
+    auto is_forbidden = [&map](const Coord<U> &coord) constexpr {
         return false == map.get_value(coord.x, coord.y);     // already taken
     };
 
@@ -69,7 +69,7 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
     struct PathDist {
         dist_t total_dist;  ///< real_distance + evaluated_distance
         Coord<U> last_coord;
-        std::vector<PathEntry> path;
+        Coord<U> came_from;
 
         // std::strong_ordering operator<=>(const PathDist &other) const
         // {
@@ -86,27 +86,54 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
     };
 
     // moving steps, all possible combinations
-    const auto steps = PathEntry::get_steps_table();
-    // PathEntry::table_arr_t steps = {
-    //     PathEntry::pair_t{-1, -1},
-    //     PathEntry::pair_t{-1,  0},
-    //     PathEntry::pair_t{-1,  1},
-    //     PathEntry::pair_t{ 0,  1},
-    //     PathEntry::pair_t{ 1,  1},
-    //     PathEntry::pair_t{ 1,  0},
-    //     PathEntry::pair_t{ 1, -1},
-    //     PathEntry::pair_t{-1,  0}
-    // };
+    //const auto steps = PathEntry::_steps_table;
+    
+    std::vector< std::pair<decltype(PathEntry::_steps_table)::value_type,  dist_t>>  steps;
+    steps.reserve(PathEntry::_steps_table.size());
+    // build dist_metric deltas for each step
+    {
+        using step_t = decltype(steps)::value_type;
+        Coord<int> zero = {0, 0};
+        for (const auto &move : PathEntry::_steps_table) {
+            Coord<int> delta = {(int)(std::get<0>(move)), (int)(std::get<1>(move))};
+            auto dist = zero.dist_metric(delta);
+            step_t el = {move, dist};
+            steps.emplace_back(el);
+        }
+    }
     
     // heap queue with .top() always returning the PathDist with smallest distance
     // std::priority_queue<PathDist, std::vector<PathDist>, std::greater<PathDist>>
     //     heapq;
+
+    // std::set always stores its elements sorted by key ascending
+    // this way heapq.begin() always points to the element with the lowest key
     std::set<PathDist> heapq;
     
-    heapq.emplace(PathDist{.total_dist = from.dist_metric(to), .last_coord = from, .path = {}});
+    heapq.emplace(PathDist{.total_dist = from.dist_metric(to), .last_coord = from, .came_from = from});
 
-    // stored coords we already visited
-    std::unordered_set<Coord<U>> visited;
+    // stored coords we already visited of a form:
+    // {current: (distance, came_from)}
+    struct VisitedEl {
+        dist_t dist;
+        Coord<U> came_from = {0,0};
+    };
+    std::unordered_map<Coord<U>, VisitedEl> visited;
+
+    auto reconstruct_path = [&](const PathDist last) {
+        std::vector<PathEntry> path;
+        auto cur = last.came_from;
+        while (cur != from) {
+            auto prev = visited[cur].came_from;
+
+            PathEntry pe(cur.x - prev.x,
+                         cur.y - prev.y);
+            path.emplace_back(pe);
+
+            cur = prev;
+        }
+        return path;
+    };
 
     // traverse the map
     while (! heapq.empty()) {
@@ -115,21 +142,22 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
         // std::cin.get();
 
         // when node is the goal, return the found path
-        if (pd.last_coord == to)  return pd.path;
+        if (pd.last_coord == to)  return reconstruct_path(pd);
         // {
         //     std::vector<Coord<U>> res(visited.begin(), visited.end());
         //     return res;
         // }
 
         // move the node to visited
-        visited.emplace(pd.last_coord);
+        visited[pd.last_coord] = {pd.total_dist, pd.came_from}; // TODO: fix price;
         heapq.erase(heapq.begin());
 
         auto pd_eval_dist = pd.last_coord.dist_metric(to);
         auto pd_pure_dist = pd.total_dist - pd_eval_dist;
 
         // for each neighbor of the current node
-        for (const auto &[dx, dy]: steps) {
+        for (const auto &[_pair, dist_delta]: steps) {
+            const auto [dx, dy] = _pair;
             Coord<U> newstep = {static_cast<U>(pd.last_coord.x + dx),
                                 static_cast<U>(pd.last_coord.y + dy)};
             
@@ -137,7 +165,7 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
             if (!is_on_map(newstep) || is_forbidden(newstep))  continue;
             
             // path up to the prev point + from prev point to current
-            dist_t new_pure_dist = pd_pure_dist + pd.last_coord.dist_metric(newstep);
+            dist_t new_pure_dist = pd_pure_dist + dist_delta;
             dist_t new_total_dist = new_pure_dist + newstep.dist_metric(to);
 
             // TODO: check that new distance is shorter than in visited
@@ -145,9 +173,7 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to)
             // if neighbor is not in heapq, add it
             if (visited.contains(newstep))  continue;
 
-            std::vector<PathEntry> newpath = pd.path;
-            newpath.emplace_back(PathEntry(dx, dy));
-            PathDist newel = {.total_dist = new_total_dist, .last_coord = newstep, .path = newpath};
+            PathDist newel = {.total_dist = new_total_dist, .last_coord = newstep, .came_from = pd.last_coord};
             heapq.emplace(newel);
         }
     }
@@ -171,11 +197,15 @@ int main(const int argc, char * const argv[])
     std::cerr << "Pathfinding\n";
 
     // Load test map
-    BinMask mask("IDEAS/testmap_small.png");
+    BinMask mask("IDEAS/testmap.png");
     //mapout(mask);
 
-    std::pair from = {79, 145},
-              to   = {69, 110};
+    // std::pair from = {79, 145},
+    //           to   = {69, 110};
+    std::pair from = {477, 862},
+              to   = {731, 154};
+    // std::pair from = {545, 640},
+    // to   = {140, 780};
     
     // std::cout << "FROM HASH: " << Coord(from).hash() << std::endl;
     // std::cout << "TO HASH: " << Coord(to).hash() << std::endl; 
