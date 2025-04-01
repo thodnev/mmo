@@ -29,8 +29,11 @@ int main(const int argc, char * const argv[])
     //     }
     //     std::cout << std::endl;
     // }
+    common::BinMask minimap("minimap/minimap.png");
+    std::cout << "MINIMAP black: " << minimap.get_value(72, 147) << std::endl;
+    std::cout << "MINIMAP white: " << minimap.get_value(85, 30) << std::endl;
 
-    //std::cout << "out of bonds: " << mask.get_value(33, 37) << std::endl;
+    // std::cout << "out of bonds: " << mask.get_value(33, 37) << std::endl;
 
 return 0;
 }
