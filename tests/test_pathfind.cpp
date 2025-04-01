@@ -79,15 +79,15 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
         // Ensures paths with the same cost (f(n)) but different destinations
         // (last_coord) are treated as unique elements in std::set
         bool operator<(const PathDist &other) const {
-            bool coords_equal = (last_coord == other.last_coord);
             return ((total_dist < other.total_dist) 
-                || ((total_dist == other.total_dist) && !coords_equal));
+                || ((total_dist == other.total_dist) && (last_coord != other.last_coord)));
         }
     };
 
+    // FIXME: steps must be sorted by distance to explore efficient paths
+
     // moving steps, all possible combinations
     //const auto steps = PathEntry::_steps_table;
-    
     std::vector< std::pair<decltype(PathEntry::_steps_table)::value_type,  dist_t>>  steps;
     steps.reserve(PathEntry::_steps_table.size());
     // build dist_metric deltas for each step
@@ -116,18 +116,19 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
     // {current: (distance, came_from)}
     struct VisitedEl {
         dist_t dist;
-        Coord<U> came_from = {0,0};
+        Coord<U> came_from = {1,1};
     };
     std::unordered_map<Coord<U>, VisitedEl> visited;
 
     auto reconstruct_path = [&](const PathDist last) {
         std::vector<PathEntry> path;
-        auto cur = last.came_from;
+        auto cur = last.came_from;     // FIXME
         while (cur != from) {
             auto prev = visited[cur].came_from;
 
-            PathEntry pe((int)cur.x - (int)prev.x,
-                         (int)cur.y - (int)prev.y);
+            auto dx = (int)cur.x - (int)prev.x;
+            auto dy = (int)cur.y - (int)prev.y;
+            PathEntry pe(dx, dy);
             path.emplace_back(pe);
 
             cur = prev;
@@ -174,13 +175,15 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
             if (is_forbidden(newstep) || !is_on_map(newstep))  continue;
             
             // path up to the prev point + from prev point to current
-            dist_t new_pure_dist = pd_pure_dist + dist_delta;
+            dist_t new_pure_dist = pd_pure_dist + pd.last_coord.dist_metric(newstep);
             dist_t new_total_dist = new_pure_dist + newstep.dist_metric(to);
 
             // TODO: check that new distance is shorter than in visited
 
             // if neighbor is not in heapq, add it
-            if (visited.contains(newstep))  continue;
+            if (visited.contains(newstep)) {
+                continue;
+            }
 
             PathDist newel = {.total_dist = new_total_dist, .last_coord = newstep, .came_from = pd.last_coord};
             heapq.emplace(newel);
@@ -235,10 +238,10 @@ int main(const int argc, char * const argv[])
 
     // std::pair from = {79, 145},
     //           to   = {69, 110};
-    // std::pair from = {477, 862},
-    //           to   = {731, 154};
-    std::pair from = {545, 640},
-    to   = {140, 780};
+    std::pair from = {477, 862},
+              to   = {731, 154};
+    // std::pair from = {545, 640},
+    // to   = {140, 780};
     
     // std::cout << "FROM HASH: " << Coord(from).hash() << std::endl;
     // std::cout << "TO HASH: " << Coord(to).hash() << std::endl; 
@@ -252,8 +255,9 @@ int main(const int argc, char * const argv[])
     std::chrono::duration<double> took = tend - tstart;
     std::cerr << std::format("Found path in {:.3f} s\n", took.count());
     
-    //dump_path(Coord(from), path);
-    dump_visited(visited);
+    std::vector<PathEntry> inv_path = {path.rbegin(), path.rend()};
+    dump_path(Coord(from), inv_path);
+    //dump_visited(visited);
     
     
     return 0;
