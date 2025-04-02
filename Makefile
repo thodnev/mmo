@@ -10,8 +10,8 @@ tests := rnd
 
 CXX = clang++
 CXXFLAGS = -std=c++2c -I$(pdir) -fprebuilt-module-path=$(bdir)/
-CXXFLAGS += -DDEBUG  -Wall -Wextra -O3 -flto # -ggdb -pg
-LDFLAGS = -std=c++2c -fprebuilt-module-path=$(bdir)/ -flto # -ggdb -pg
+CXXFLAGS += -DDEBUG -O3 -flto -Wall -Wextra -ggdb3 #-pg
+LDFLAGS = -std=c++2c -O3 -flto -I$(pdir) -DDEBUG -fprebuilt-module-path=$(bdir)/ -ggdb3 # -pg
 LDLIBS = $(shell pkg-config libpng --libs)
 
 # build directory

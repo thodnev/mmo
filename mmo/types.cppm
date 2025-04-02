@@ -289,12 +289,16 @@ struct [[gnu::packed]] Coord {
     /// Should give us 0.03% error
     constexpr unsigned long dist_metric(const Coord &other) const noexcept
     {
-        unsigned long dx = std::abs((long)this->x - (long)other.x);
-        unsigned long dy = std::abs((long)this->y - (long)other.y);
+        // Don't use std::abs, std::min and std::max. Slow shit
+        // unsigned long dx = std::abs((long)this->x - (long)other.x);
+        // unsigned long dy = std::abs((long)this->y - (long)other.y);
+        // auto dst = 128 * std::max(dx, dy) + 53 * std::min(dx, dy);
+        unsigned long dx = x > other.x ? x - other.x : other.x - x;
+        unsigned long dy = y > other.y ? y - other.y : other.y - y;
 
-        auto dst = 128 * std::max(dx, dy) + 53 * std::min(dx, dy);
-        // auto dst = dx + dy;
-        return dst;
+        auto dst = 128 * (dx > dy ? dx : dy) + 53 * (dx > dy ? dy : dx);
+
+        return dst / 2;     // dunno why, but /2 it is faster
     }
 };
 }       // namespace types

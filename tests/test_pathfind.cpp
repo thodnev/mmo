@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <chrono>
+#include "macro.hpp"
 
 import types;
 import common;
@@ -80,7 +81,7 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
         // (last_coord) are treated as unique elements in std::set
         bool operator<(const PathDist &other) const {
             return ((total_dist < other.total_dist) 
-                || ((total_dist == other.total_dist) && (last_coord != other.last_coord)));
+                    || ((total_dist == other.total_dist) && (last_coord != other.last_coord)));
         }
     };
 
@@ -88,17 +89,30 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
 
     // moving steps, all possible combinations
     //const auto steps = PathEntry::_steps_table;
-    std::vector< std::pair<decltype(PathEntry::_steps_table)::value_type,  dist_t>>  steps;
-    steps.reserve(PathEntry::_steps_table.size());
-    // build dist_metric deltas for each step
+    std::array<PathEntry::pair_t, 8> moves = {
+        // diagonals
+        // straight
+        PathEntry::pair_t{ 1, 1},
+        PathEntry::pair_t{1, 0},
+
+        PathEntry::pair_t{ 1,  -1},
+        PathEntry::pair_t{ 0, -1},
+        
+        PathEntry::pair_t{ -1, -1},
+        PathEntry::pair_t{ -1, 0},
+
+        PathEntry::pair_t{-1,  1},
+        PathEntry::pair_t{0, 1}
+    };
+
+    std::vector<std::pair<PathEntry::pair_t, dist_t>> steps;
     {
-        using step_t = decltype(steps)::value_type;
-        Coord<int> zero = {0, 0};
-        for (const auto &move : PathEntry::_steps_table) {
-            Coord<int> delta = {(int)(std::get<0>(move)), (int)(std::get<1>(move))};
-            auto dist = zero.dist_metric(delta);
-            step_t el = {move, dist};
-            steps.emplace_back(el);
+        Coord<U> zero = {1, 1};
+        for (const auto &move : moves) {
+            const auto [dx, dy] = move;
+            Coord<U> oth = {static_cast<U>(1 + dx), static_cast<U>(1 + dy)};
+            LOG("[{}, {}] cost={}", dx, dy, zero.dist_metric(oth));
+            steps.push_back({move, zero.dist_metric(oth)});
         }
     }
     
@@ -119,6 +133,7 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
         Coord<U> came_from = {1,1};
     };
     std::unordered_map<Coord<U>, VisitedEl> visited;
+    visited.reserve(map.width * map.height);        // preallocate
 
     auto reconstruct_path = [&](const PathDist last) {
         std::vector<PathEntry> path;
@@ -139,10 +154,13 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
     auto reconstruct_visited = [](const decltype(visited) &vis) constexpr {
         std::vector<Coord<U>> res;
         for (const auto &[key, val] : vis) {
-            res.push_back(key);
+            res.emplace_back(key);
         }
         return res;
     };
+
+    // TIMEIT
+    auto tstart = std::chrono::high_resolution_clock::now();
 
     // traverse the map
     while (! heapq.empty()) {
@@ -155,15 +173,20 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
             // (!) PATH FOUND (!)
             if (set_visited != nullptr) *set_visited = reconstruct_visited(visited);
 
+            // TIMEIT END
+            auto tend = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> took = tend - tstart;
+            std::cerr << std::format("Found path in {:.3f} s\n", took.count());
+
             return reconstruct_path(pd);
         }
 
-        // move the node to visited
-        visited[pd.last_coord] = {pd.total_dist, pd.came_from}; // TODO: fix price;
-        heapq.erase(heapq.begin());
-
         auto pd_eval_dist = pd.last_coord.dist_metric(to);
         auto pd_pure_dist = pd.total_dist - pd_eval_dist;
+
+        // move the node to visited
+        visited[pd.last_coord] = {pd_pure_dist, pd.came_from}; // TODO: fix price;
+        heapq.erase(heapq.begin());
 
         // for each neighbor of the current node
         for (const auto &[_pair, dist_delta]: steps) {
@@ -175,13 +198,14 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
             if (is_forbidden(newstep) || !is_on_map(newstep))  continue;
             
             // path up to the prev point + from prev point to current
-            dist_t new_pure_dist = pd_pure_dist + pd.last_coord.dist_metric(newstep);
+            dist_t new_pure_dist = pd_pure_dist + dist_delta;
             dist_t new_total_dist = new_pure_dist + newstep.dist_metric(to);
 
             // TODO: check that new distance is shorter than in visited
 
             // if neighbor is not in heapq, add it
-            if (visited.contains(newstep)) {
+            auto it = visited.find(newstep);        // avoid double lookups
+            if (it != visited.end() && it->second.dist <= new_pure_dist) {
                 continue;
             }
 
@@ -190,6 +214,8 @@ auto find_path(const BinMask<T> &map, Coord<U> from, Coord<U> to, std::vector<Co
         }
     }
     std::cerr << "FINISH TRAVERSAL\n";
+    *set_visited = reconstruct_visited(visited);
+    return std::vector<PathEntry>();
 }
 
 template<typename U>
@@ -233,31 +259,21 @@ int main(const int argc, char * const argv[])
     std::cerr << "Pathfinding\n";
 
     // Load test map
-    BinMask mask("IDEAS/testmap.png");
+    BinMask mask("tests/maps/pthtest_2x.png");
     //mapout(mask);
 
-    // std::pair from = {79, 145},
-    //           to   = {69, 110};
-    std::pair from = {477, 862},
-              to   = {731, 154};
-    // std::pair from = {545, 640},
-    // to   = {140, 780};
+    std::pair from = {148, 257},
+                to = {239,  19};
     
     // std::cout << "FROM HASH: " << Coord(from).hash() << std::endl;
     // std::cout << "TO HASH: " << Coord(to).hash() << std::endl; 
 
-    auto tstart = std::chrono::high_resolution_clock::now();
-
     std::vector<Coord<int16_t>> visited;
     auto path = find_path(mask, Coord(from), Coord(to), &visited);
-
-    auto tend = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> took = tend - tstart;
-    std::cerr << std::format("Found path in {:.3f} s\n", took.count());
     
     std::vector<PathEntry> inv_path = {path.rbegin(), path.rend()};
-    dump_path(Coord(from), inv_path);
-    //dump_visited(visited);
+    // dump_path(Coord(from), inv_path);
+    dump_visited(visited);
     
     
     return 0;
