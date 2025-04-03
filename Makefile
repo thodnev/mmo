@@ -4,12 +4,12 @@ MAKEFLAGS += --jobs=$(shell nproc)
 
 .PHONY:	all clean run test_%
 
-modules := types common rnd
+modules := types common rnd pthfind
 objs := main png_wrap utils
 tests := rnd
 
 CXX = clang++
-CXXFLAGS = -std=c++2c -I$(pdir) -fprebuilt-module-path=$(bdir)/
+CXXFLAGS += -std=c++2c -I$(pdir) -fprebuilt-module-path=$(bdir)/
 CXXFLAGS += -DDEBUG -O3 -flto -Wall -Wextra -ggdb3 #-pg
 LDFLAGS = -std=c++2c -O3 -flto -I$(pdir) -DDEBUG -fprebuilt-module-path=$(bdir)/ -ggdb3 # -pg
 LDLIBS = $(shell pkg-config libpng --libs)
@@ -47,6 +47,7 @@ $(bdir)/test_binmask: $(call pcm,common) $(call obj,utils)
 
 # Intermodule dependencies
 $(call pcm,common): | $(call pcm,types)
+$(call pcm,pthfind): | $(call pcm,common)
 
 # General dependencies
 $(bdir)/main.o: $(pcm_modules)
@@ -72,7 +73,7 @@ run: $(bdir)/main
 	@./$<
 
 $(bdir)/%.pcm: $(pdir)/%.cppm | $(bdir)
-	$(CXX) $(CXXFLAGS) --precompile -o $@ -c $^
+	$(CXX) $(CXXFLAGS) --precompile -o $@ -c $^ $(EXTRAFLAGS)
 
 $(bdir)/%.o: $(pdir)/%.cpp | $(bdir)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
