@@ -1,3 +1,4 @@
+#pragma once
 #if defined(DEBUG) && ((DEBUG) == 1)
     #include <format>
     #include <iostream>

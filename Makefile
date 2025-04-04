@@ -40,7 +40,8 @@ obj_files := $(call obj,$(objs))
 all: | $(bdir)/main main
 
 # Test dependencies
-$(bdir)/test_pathfind: $(call obj,utils) $(call pcm,common types)
+$(bdir)/test_pthfind: $(call obj,utils) $(call pcm,common types pthfind)
+$(bdir)/test_pathfind_algo: $(call obj,utils) $(call pcm,common types)
 $(bdir)/test_path: $(call pcm,types)
 $(bdir)/test_rnd: $(call pcm,rnd)
 $(bdir)/test_binmask: $(call pcm,common) $(call obj,utils)
