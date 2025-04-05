@@ -104,8 +104,10 @@ constexpr inline dist_t distance_octile(unsigned long ax, unsigned long ay,
     unsigned long dy = ay > by ? ay - by : by - ay;   // coord values must be smaller than that
 
     auto dst = 128 * (dx > dy ? dx : dy) + 53 * (dx < dy ? dx : dy);
-    // dunno why, but result/2 it is faster. Save one asm instr by now
-    return dst / 64;     
+    // return dst / 48;   
+    // (!) Overfit without div. /2 and /4 in theory give 0.014% and 0.020% error
+    // /16 is maximum 2**power. More, and straight/diagonal steps get indistinguishable
+    return dst / 2;      
 }
 
 /// Wrapper encapsulating the concrete dist metric computation method
@@ -302,12 +304,29 @@ constexpr std::vector<types::PathEntry> reconstruct_path(
 }
 
 
+constexpr const std::vector<Coord> reconstruct_visited(const BBox &bbox, const std::vector<VisitedEntry> &visited)
+{
+    std::vector<Coord> res;
+    res.reserve(bbox.get_index(bbox.most));
+
+    for (size_t idx = 0; idx < bbox.get_index(bbox.most); idx++)
+    {
+        if (visited[idx].is_empty())  continue;
+        const RelCoord rel = {.x = (bbox_sgn_t)(idx % (size_t)bbox.most.x),
+                              .y = (bbox_sgn_t)(idx / (size_t)bbox.most.x)};
+        res.emplace_back(bbox.to_absolute(rel));
+    }
+    return res;
+}
+
+
 /// A* pathfinding implementation
 /// @param radius   Squircle radius limiting the area `from` starting point,
 ///                 in which the lookup is performed.
 ///                 When set to 0 (default) - no limits apply and
 ///                 the whole map is traversed.
-/* export */ auto pathfind_astar(const map_t &map, const Coord from, const Coord to, const dist_t radius = 0)
+/* export */ auto pathfind_astar(const map_t &map, const Coord from, const Coord to, const dist_t radius = 0,
+                                 std::vector<Coord> *set_visited = nullptr)
 {
     utils::TimeIt _time_init(true);
 
@@ -386,6 +405,11 @@ constexpr std::vector<types::PathEntry> reconstruct_path(
         if (el.coord == bboxed_to) {            // found
             _time_lookup.report_took("map traversal");
             LOG("FOUND PATH");
+
+            if (set_visited != nullptr) {
+                *set_visited = reconstruct_visited(bbox, visited);
+            }
+
             return reconstruct_path(
                 el.coord,
                 bbox.to_relative(from), bbox, visited
@@ -434,6 +458,11 @@ constexpr std::vector<types::PathEntry> reconstruct_path(
     }
     
     LOG("PATH NOT FOUND");
+
+    if (set_visited != nullptr) {
+        *set_visited = reconstruct_visited(bbox, visited);
+    }
+
     return std::vector<types::PathEntry>();     // @FIXME
 }
 

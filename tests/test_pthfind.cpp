@@ -24,6 +24,12 @@ void dump_path(const Coord startpoint, const std::vector<types::PathEntry> &path
     }
 }
 
+void dump_visited(const std::vector<Coord> &visited, std::ostream &out = std::cout) {
+    for (const auto &el : visited) {
+        out << el.x << "\t" << el.y << std::endl;
+    }
+}
+
 int main(const int argc, char * const argv[])
 {
     std::cerr << "Test pthfind\n";
@@ -33,17 +39,22 @@ int main(const int argc, char * const argv[])
 
     // std::pair from = {148, 257},
     //             to = {239,  19};
-    std::pair from = {108, 439},
-                to = {186,  346};
+    // std::pair from = {108, 439},
+    //             to = {186,  346};
+    std::pair from = {298, 512},
+                to = {466,  37};
     LOG("Looking for path ({}, {}) -> ({}, {})",
         from.first, from.second, to.first, to.second);
     // TODO: check when radius is 0
+    std::vector<Coord> visited;
     auto path = pathfind_astar(testmap, Coord{(axis_t)from.first, (axis_t)from.second},
                Coord{(axis_t)to.first, (axis_t)to.second},
-            130);
+            560, &visited);
 
 
     dump_path(Coord{(axis_t)from.first, (axis_t)from.second},
               path);
+    std::cout << "\n\n";
+    dump_visited(visited);
     return 0;
 }
