@@ -12,13 +12,16 @@ module;
 #include <vector>
 
 #include "macro.hpp"
+#include "utils.hpp"
 
 #include <algorithm>
 #include <array>
 #include <stdexcept>
 
-export module pthfind;
+#include <boost/heap/fibonacci_heap.hpp>
 
+export module pthfind;
+import types;
 import common;
 
 export namespace pthfind {
@@ -55,6 +58,11 @@ struct CoordBase {
     constexpr inline bool is_zero() const
     {
         return !x && !y;
+    }
+
+    constexpr inline bool operator==(const CoordBase<T> &other) const
+    {
+        return x == other.x && y == other.y;
     }
 };
 
@@ -97,7 +105,7 @@ constexpr inline dist_t distance_octile(unsigned long ax, unsigned long ay,
 
     auto dst = 128 * (dx > dy ? dx : dy) + 53 * (dx < dy ? dx : dy);
     // dunno why, but result/2 it is faster. Save one asm instr by now
-    return dst;     
+    return dst / 64;     
 }
 
 /// Wrapper encapsulating the concrete dist metric computation method
@@ -232,6 +240,68 @@ struct BBox {
 };
 
 
+/// This is what we store in visited list (aka closed set)
+struct VisitedEntry {
+    RelCoord came_from;
+    dist_t pure_dist;
+
+    constexpr inline bool is_empty() const
+    {
+        return came_from.is_zero() && pure_dist == 0;
+    }
+};
+
+/// This gets stored in heapq (aka open set)
+struct HeapEntry {
+    /// memory is cheap, so store both distances
+    dist_t total_dist;      ///< pure_dist + heurestic
+    dist_t pure_dist;       ///< actual distance that we counted so far
+    RelCoord coord;         ///< current relative coordinate
+
+    /// Required for MinHeap comparisons
+    // (!!) seems stupid boost::fibonacci_heap is MaxHeap, so invert this shit
+    inline bool operator<(const HeapEntry &other) const {
+        return total_dist > other.total_dist;
+    }
+};
+
+
+constexpr std::vector<types::PathEntry> reconstruct_path(
+    const RelCoord &path_finish,
+    const RelCoord &path_start,
+    const BBox &bbox,
+    const std::vector<VisitedEntry> &visited)
+{
+    LOG("Backtracing path ({}, {}) -> ({}, {})",
+        path_finish.x, path_finish.y,path_start.x, path_start.y);
+    
+    utils::TimeIt _time_reconstr{};
+
+    std::vector<types::PathEntry> path;
+    path.reserve(bbox.get_index(bbox.most));
+
+    auto cur_coord = path_finish;
+    size_t idx;
+    while (cur_coord != path_start) {
+        idx = bbox.get_index(cur_coord);
+
+        const auto from_coord = visited[idx].came_from;
+        if (cur_coord == path_start)  break;
+        const auto dx = cur_coord.x - from_coord.x,
+                   dy = cur_coord.y - from_coord.y;
+        
+        const types::PathEntry pe(dx, dy);
+        path.emplace_back(pe);
+
+        cur_coord = from_coord;
+    }
+
+    _time_reconstr.report_took("path reconstruction");
+
+    return path;
+}
+
+
 /// A* pathfinding implementation
 /// @param radius   Squircle radius limiting the area `from` starting point,
 ///                 in which the lookup is performed.
@@ -239,6 +309,7 @@ struct BBox {
 ///                 the whole map is traversed.
 /* export */ auto pathfind_astar(const map_t &map, const Coord from, const Coord to, const dist_t radius = 0)
 {
+    utils::TimeIt _time_init(true);
 
     // Ensure coordinates belong to map and aren't forbidden
     ensure_coord_valid(map, from);
@@ -277,6 +348,93 @@ struct BBox {
     LOG("Original distance: {}, transformed distance: {}",
         distance(from, to), distance(bbox_from, bbox_to));
 
+    LOG("VisitedEntry size: {}, HeapEntry size: {}", sizeof(VisitedEntry), sizeof(HeapEntry));
+    
+    std::vector<VisitedEntry> visited;
+    visited.assign(bbox.get_index(bbox.most) + 1,
+                   VisitedEntry{.came_from = {0, 0}, .pure_dist = 0});
+    visited[bbox.get_index(bbox.to_relative(from))] = {
+        .came_from = bbox.to_relative(from),
+        .pure_dist = 0
+    };
+    // LOG("Visited vector size: {} KiB", (visited.size() * sizeof(visited[0])) / 1024);
+    // Alignment paranoia
+    LOG("Visited vector total size: {} KiB",
+        ((uint8_t *)&(*(visited.end() - 1)) - (uint8_t *)&(*visited.begin())) / 1024);
+    
+
+    // Fuck slow STL data structures.
+    // Use Boost Fibonacci heap until we find something better
+    boost::heap::fibonacci_heap<HeapEntry> heapq;
+    // put the starting element
+    heapq.push(HeapEntry{.coord = bbox.to_relative(from),
+                         .total_dist = std::numeric_limits<dist_t>::max(),
+                         .pure_dist = 0});
+
+    const auto bboxed_to = bbox.to_relative(to);
+    
+    // start traversal
+    _time_init.report_took("initialization");
+    utils::TimeIt _time_lookup{};
+
+    while (! heapq.empty()) {
+        // dequeue lowest element
+        const auto el = heapq.top();
+        heapq.pop();        // remove from heap
+
+        // check whether destination reached
+        if (el.coord == bboxed_to) {            // found
+            _time_lookup.report_took("map traversal");
+            LOG("FOUND PATH");
+            return reconstruct_path(
+                el.coord,
+                bbox.to_relative(from), bbox, visited
+            );     // @FIXME
+        }
+
+        // check neighbors
+        for (size_t i = 0; i < steps.size(); i++) {
+            const auto [dx, dy] = steps[i];          // should be more efficient
+            const auto step_dist = steps_dist[i];    // than unpacking tuples of tuples
+
+            const RelCoord newcoord = { .x = static_cast<bbox_sgn_t>(el.coord.x + dx), 
+                                        .y = static_cast<bbox_sgn_t>(el.coord.y + dy) };
+            
+            // @TODO: find more optimal way for this check
+            if (newcoord.x < 0 || newcoord.y < 0) {
+                continue;       // rel coords can't be negative
+            }
+
+            const auto new_pure_dist = el.pure_dist + step_dist;
+
+            // @TODO: play with the order of checks
+
+            // @TODO: check dist_metric
+            if (!bbox.is_inside(newcoord) || is_forbidden(map, bbox.to_absolute(newcoord))) {
+                continue;
+            }
+
+            const auto idx = bbox.get_index(newcoord);
+            if (!visited[idx].is_empty() && new_pure_dist >= visited[idx].pure_dist) {
+                continue;       // don't revisit if not more optimal
+            }
+
+            // enqueue if found new or more optimal point
+            visited[idx].pure_dist = new_pure_dist;
+            visited[idx].came_from = el.coord;
+            
+            const HeapEntry newel = {
+                .total_dist = new_pure_dist + distance(newcoord, bboxed_to),
+                .pure_dist = new_pure_dist,
+                .coord = newcoord
+            };
+
+            heapq.push(newel);
+        }
+    }
+    
+    LOG("PATH NOT FOUND");
+    return std::vector<types::PathEntry>();     // @FIXME
 }
 
 

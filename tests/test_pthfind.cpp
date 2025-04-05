@@ -3,8 +3,26 @@
 #include <utility>
 import pthfind;
 import common;
+import types;
 
 using namespace pthfind;
+
+void dump_path(const Coord startpoint, const std::vector<types::PathEntry> &path, std::ostream &out = std::cout) {
+    auto cur_x = startpoint.x;
+    auto cur_y = startpoint.y;
+    auto i = 0;
+    for (auto it = path.rbegin(); it != path.rend(); ++it) {
+        const auto el = *it;
+        auto [dx, dy] = el.to_coords();
+        cur_x += dx;
+        cur_y += dy;
+
+        //std::cout << std::format("{:<3} [{}, {}]\t", i, cur_x, cur_y);
+        //std::cout << el << std::endl;
+        out << cur_x << "\t" << cur_y << std::endl;
+        i++;
+    }
+}
 
 int main(const int argc, char * const argv[])
 {
@@ -20,8 +38,12 @@ int main(const int argc, char * const argv[])
     LOG("Looking for path ({}, {}) -> ({}, {})",
         from.first, from.second, to.first, to.second);
     // TODO: check when radius is 0
-    pathfind_astar(testmap, Coord{(axis_t)from.first, (axis_t)from.second},
+    auto path = pathfind_astar(testmap, Coord{(axis_t)from.first, (axis_t)from.second},
                Coord{(axis_t)to.first, (axis_t)to.second},
             130);
+
+
+    dump_path(Coord{(axis_t)from.first, (axis_t)from.second},
+              path);
     return 0;
 }

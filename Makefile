@@ -10,9 +10,11 @@ tests := rnd
 
 CXX = clang++
 CXXFLAGS += -std=c++2c -I$(pdir) -fprebuilt-module-path=$(bdir)/
-CXXFLAGS += -DDEBUG -O3 -flto -Wall -Wextra -ggdb3 #-pg
-LDFLAGS = -std=c++2c -O3 -flto -I$(pdir) -DDEBUG -fprebuilt-module-path=$(bdir)/ -ggdb3 # -pg
+CXXFLAGS += -O3 -flto -Wall -Wextra -ggdb3 #-pg
+LDFLAGS = -std=c++2c -O3 -flto -I$(pdir) -fprebuilt-module-path=$(bdir)/ -ggdb3 # -pg
 LDLIBS = $(shell pkg-config libpng --libs)
+# CXXFLAGS += -DDEBUG
+# LDFLAGS += -DDEBUG
 
 # build directory
 bdir := .build
@@ -61,6 +63,9 @@ $(bdir)/png_wrap.o: CXXFLAGS += $(shell pkg-config libpng --cflags)
 #$(bdir)/png_wrap: LDFLAGS += $(shell pkg-config libpng --libs)
 #$(bdir)/png_wrap: $(bdir)/png_wrap.o $(bdir)/utils.o
 #	$(CXX) $(LDFLAGS) -o $@ $^
+
+# FIXME: header dependencies
+$(call obj,utils): $(pdir)/utils.hpp
 
 $(bdir):
 	mkdir $@
