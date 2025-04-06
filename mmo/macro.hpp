@@ -1,4 +1,12 @@
 #pragma once
+
+// set constant to allow using in regular if-blocks
+#if defined(DEBUG) && ((DEBUG) == 1)
+    #define USE_DEBUG (1)
+#else
+    #define USE_DEBUG (0)
+#endif
+
 #if defined(DEBUG) && ((DEBUG) == 1)
     #include <format>
     #include <iostream>

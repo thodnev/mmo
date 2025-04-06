@@ -49,12 +49,13 @@ int main(const int argc, char * const argv[])
     std::vector<Coord> visited;
     auto path = pathfind_astar(testmap, Coord{(axis_t)from.first, (axis_t)from.second},
                Coord{(axis_t)to.first, (axis_t)to.second},
-            560, &visited);
+            560, visited);
 
 
     dump_path(Coord{(axis_t)from.first, (axis_t)from.second},
               path);
     std::cout << "\n\n";
-    dump_visited(visited);
+    //dump_visited(visited);
+    std::cerr << "Visited sz=" << visited.size() << ", Cap=" << visited.capacity() << "\n";
     return 0;
 }

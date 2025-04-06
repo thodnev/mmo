@@ -277,7 +277,7 @@ constexpr std::vector<types::PathEntry> reconstruct_path(
     LOG("Backtracing path ({}, {}) -> ({}, {})",
         path_finish.x, path_finish.y,path_start.x, path_start.y);
     
-    utils::TimeIt _time_reconstr{};
+    utils::TimeIt _time_rec_path{};
 
     std::vector<types::PathEntry> path;
     path.reserve(bbox.get_index(bbox.most));
@@ -288,7 +288,7 @@ constexpr std::vector<types::PathEntry> reconstruct_path(
         idx = bbox.get_index(cur_coord);
 
         const auto from_coord = visited[idx].came_from;
-        if (cur_coord == path_start)  break;
+        // if (cur_coord == path_start)  break;    // paranoia
         const auto dx = cur_coord.x - from_coord.x,
                    dy = cur_coord.y - from_coord.y;
         
@@ -298,25 +298,33 @@ constexpr std::vector<types::PathEntry> reconstruct_path(
         cur_coord = from_coord;
     }
 
-    _time_reconstr.report_took("path reconstruction");
+    path.shrink_to_fit();       // free unused mem
+
+    _time_rec_path.report_took("path reconstruction");
 
     return path;
 }
 
 
-constexpr const std::vector<Coord> reconstruct_visited(const BBox &bbox, const std::vector<VisitedEntry> &visited)
+constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEntry> &visited,
+                                   std::vector<Coord> &result)
 {
-    std::vector<Coord> res;
-    res.reserve(bbox.get_index(bbox.most));
+    utils::TimeIt _time_rec_visited{};
+
+    result.clear();
+    result.reserve(bbox.get_index(bbox.most));  // alloc with excess
 
     for (size_t idx = 0; idx < bbox.get_index(bbox.most); idx++)
     {
         if (visited[idx].is_empty())  continue;
         const RelCoord rel = {.x = (bbox_sgn_t)(idx % (size_t)bbox.most.x),
                               .y = (bbox_sgn_t)(idx / (size_t)bbox.most.x)};
-        res.emplace_back(bbox.to_absolute(rel));
+        result.emplace_back(bbox.to_absolute(rel));
     }
-    return res;
+
+    result.shrink_to_fit();     // free unused mem
+
+    _time_rec_visited.report_took("visited reconstruction");
 }
 
 
@@ -326,7 +334,7 @@ constexpr const std::vector<Coord> reconstruct_visited(const BBox &bbox, const s
 ///                 When set to 0 (default) - no limits apply and
 ///                 the whole map is traversed.
 /* export */ auto pathfind_astar(const map_t &map, const Coord from, const Coord to, const dist_t radius = 0,
-                                 std::vector<Coord> *set_visited = nullptr)
+                                 std::optional<std::reference_wrapper<std::vector<Coord>>> set_visited = std::nullopt)
 {
     utils::TimeIt _time_init(true);
 
@@ -351,24 +359,26 @@ constexpr const std::vector<Coord> reconstruct_visited(const BBox &bbox, const s
     // top left corner serves as a coordinate offset to map global <-> relative coords
     const BBox bbox(from, radius);
 
-    const Coord bbox_base = bbox.base;
-    // bottom right corner in relative coordinates
-    const RelCoord bbox_most = bbox.most;
-    // transform global coords -> coords relative to bbox
-    const RelCoord bbox_from = bbox.to_relative(from);
-    const RelCoord bbox_to = bbox.to_relative(to);
-    // {(bbox_sgn_t)std::max((long)to.x - bbox_base.x, 0L),
-    // (bbox_sgn_t)std::max((long)to.y - bbox_base.y, 0L)};
+    if (USE_DEBUG) {
+        [[maybe_unused]] const Coord bbox_base = bbox.base;
+        // bottom right corner in relative coordinates
+        [[maybe_unused]] const RelCoord bbox_most = bbox.most;
+        // transform global coords -> coords relative to bbox
+        [[maybe_unused]] const RelCoord bbox_from = bbox.to_relative(from);
+        [[maybe_unused]] const RelCoord bbox_to = bbox.to_relative(to);
+        // {(bbox_sgn_t)std::max((long)to.x - bbox_base.x, 0L),
+        // (bbox_sgn_t)std::max((long)to.y - bbox_base.y, 0L)};
 
-    LOG("Set bbox base to: ({}, {})", bbox_base.x, bbox_base.y);
-    LOG("Bbox most boundary: ({}, {})", bbox_most.x, bbox_most.y);
-    LOG("Transformed FROM ({}, {}) -> ({}, {})", from.x, from.y, bbox_from.x, bbox_from.y);
-    LOG("Transformed TO ({}, {}) -> ({}, {})", to.x, to.y, bbox_to.x, bbox_to.y);
-    LOG("Original distance: {}, transformed distance: {}",
-        distance(from, to), distance(bbox_from, bbox_to));
+        LOG("Set bbox base to: ({}, {})", bbox_base.x, bbox_base.y);
+        LOG("Bbox most boundary: ({}, {})", bbox_most.x, bbox_most.y);
+        LOG("Transformed FROM ({}, {}) -> ({}, {})", from.x, from.y, bbox_from.x, bbox_from.y);
+        LOG("Transformed TO ({}, {}) -> ({}, {})", to.x, to.y, bbox_to.x, bbox_to.y);
+        LOG("Original distance: {}, transformed distance: {}",
+            distance(from, to), distance(bbox_from, bbox_to));
 
-    LOG("VisitedEntry size: {}, HeapEntry size: {}", sizeof(VisitedEntry), sizeof(HeapEntry));
-    
+        LOG("VisitedEntry size: {}, HeapEntry size: {}", sizeof(VisitedEntry), sizeof(HeapEntry));
+    }
+
     std::vector<VisitedEntry> visited;
     visited.assign(bbox.get_index(bbox.most) + 1,
                    VisitedEntry{.came_from = {0, 0}, .pure_dist = 0});
@@ -376,6 +386,7 @@ constexpr const std::vector<Coord> reconstruct_visited(const BBox &bbox, const s
         .came_from = bbox.to_relative(from),
         .pure_dist = 0
     };
+
     // LOG("Visited vector size: {} KiB", (visited.size() * sizeof(visited[0])) / 1024);
     // Alignment paranoia
     LOG("Visited vector total size: {} KiB",
@@ -386,9 +397,10 @@ constexpr const std::vector<Coord> reconstruct_visited(const BBox &bbox, const s
     // Use Boost Fibonacci heap until we find something better
     boost::heap::fibonacci_heap<HeapEntry> heapq;
     // put the starting element
-    heapq.push(HeapEntry{.coord = bbox.to_relative(from),
-                         .total_dist = std::numeric_limits<dist_t>::max(),
-                         .pure_dist = 0});
+    heapq.push(HeapEntry{.total_dist = std::numeric_limits<dist_t>::max(),
+                         .pure_dist = 0,
+                         .coord = bbox.to_relative(from)
+                        });
 
     const auto bboxed_to = bbox.to_relative(to);
     
@@ -406,8 +418,8 @@ constexpr const std::vector<Coord> reconstruct_visited(const BBox &bbox, const s
             _time_lookup.report_took("map traversal");
             LOG("FOUND PATH");
 
-            if (set_visited != nullptr) {
-                *set_visited = reconstruct_visited(bbox, visited);
+            if (set_visited) {
+                reconstruct_visited(bbox, visited, *set_visited);
             }
 
             return reconstruct_path(
@@ -459,8 +471,8 @@ constexpr const std::vector<Coord> reconstruct_visited(const BBox &bbox, const s
     
     LOG("PATH NOT FOUND");
 
-    if (set_visited != nullptr) {
-        *set_visited = reconstruct_visited(bbox, visited);
+    if (set_visited) {
+        reconstruct_visited(bbox, visited, *set_visited);
     }
 
     return std::vector<types::PathEntry>();     // @FIXME
