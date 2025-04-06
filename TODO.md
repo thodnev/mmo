@@ -14,13 +14,18 @@ Higher-order tasks:
 - [ ] Implement map tiling (not that easy);
 
 Concrete tasks:
+- [ ] Implement math overloads to unlock vector ops and SIMD optimizations.
+      Compiler often optimizes them better than raw code
+- [ ] Align visited to cache line (e.g., alignas(64)) for SIMD prefetch;
 - [ ] Hot inlinable raw map get by coordinates, to eliminate redundant checks;
-- [ ] More optimal `heapq`, better suited for the task;
+- [ ] More optimal `heapq`, better suited for the task.
+      Try Binary Heap / B-Heap, Emplace Heap;
 - [ ] Try applying squircle distance check, in addition to bbox boundaries.
       Time it.
 - [ ] Optimize `visited` initialization.
       Try `std::fill`, `std::vector::assign`, loop, `std::memset` (*careful*).
-      Find out which one is faster;
+      Find out which one is faster.
+      Reconsider `std::memset` though vectors won't report correct count;
 - [ ] Optimize `visited` reconstruction;
       Now it is slow AF compared to other lookup internals;
 - [ ] Profile it. Find and eliminate bottlenecks;

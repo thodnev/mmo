@@ -55,7 +55,7 @@ int main(const int argc, char * const argv[])
     dump_path(Coord{(axis_t)from.first, (axis_t)from.second},
               path);
     std::cout << "\n\n";
-    //dump_visited(visited);
-    std::cerr << "Visited sz=" << visited.size() << ", Cap=" << visited.capacity() << "\n";
+    dump_visited(visited);
+    //std::cerr << "Visited sz=" << visited.size() << ", Cap=" << visited.capacity() << "\n";
     return 0;
 }

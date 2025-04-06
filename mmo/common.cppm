@@ -29,7 +29,29 @@ public:
 
     size_t num_set_bits();
 
-    bool get_value(const T x, const T y) const;
+    /// Gets value from coordinate pair, without checking for coordinate bounds
+    /// (UNSAFE) This may result in out-of-bonds access, so know what you're doing.
+    /// Use `get_value()` instead if bounds check needed
+    [[gnu::hot, gnu::always_inline]]
+    constexpr inline bool get_value_raw(const T x, const T y) const noexcept
+    {
+        size_t idx = y * this->width + x;
+        auto byte = this->flat[idx / 8];
+        return byte & (1 << (7 - (idx % 8)));
+    }
+
+    /// Same as `get_value_raw()`, but performs boundary checks
+    constexpr inline bool get_value(const T x, const T y) const
+    {
+        if ((x >= this->width) || (y >= this->height)) {
+            throw std::out_of_range(std::format(
+                "Coordinates ({}, {}) out of {}x{} size",
+                x, y, this->width, this->height
+            ));
+        }
+    
+        return this->get_value_raw(x, y);
+    }
 
 private:
     void from_png(const std::filesystem::path &file);
@@ -82,21 +104,6 @@ size_t BinMask<T>::num_set_bits()
     return utils::count_bits(this->flat);
 }
 
-
-template <typename T>
-bool BinMask<T>::get_value(const T x, const T y) const
-{
-    if ((x >= this->width) || (y >= this->height)) {
-        throw std::out_of_range(std::format(
-            "Coordinates ({}, {}) out of {}x{} size",
-            x, y, this->width, this->height
-        ));
-    }
-
-    size_t idx = y * this->width + x;
-    auto byte = this->flat[idx / 8];
-    return byte & (1 << (7 - (idx % 8)));
-}
 
 template <typename T>
 void IndexedBinMask<T>::_set_indices()

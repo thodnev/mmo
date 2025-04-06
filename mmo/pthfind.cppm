@@ -5,20 +5,21 @@ module;
 // language features, to crank the hell out of performance.
 // Hope it gets encapsulated by the upper hierarchy code.
 
-#include <cstdint>
-#include <format>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#include <boost/heap/fibonacci_heap.hpp>
 
 #include "macro.hpp"
 #include "utils.hpp"
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
+#include <cstring>
+#include <format>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#include <boost/heap/fibonacci_heap.hpp>
 
 export module pthfind;
 import types;
@@ -60,7 +61,7 @@ struct CoordBase {
         return !x && !y;
     }
 
-    constexpr inline bool operator==(const CoordBase<T> &other) const
+    constexpr inline bool operator==(const CoordBase<T> &other) const noexcept
     {
         return x == other.x && y == other.y;
     }
@@ -96,10 +97,7 @@ constexpr inline dist_t distance_octile(unsigned long ax, unsigned long ay,
                                         unsigned long bx, unsigned long by) noexcept
 {
     // Don't use std::abs, std::min and std::max. Slow shit
-    // unsigned long dx = std::abs((long)this->x - (long)other.x);
-    // unsigned long dy = std::abs((long)this->y - (long)other.y);
-    // auto dst = 128 * std::max(dx, dy) + 53 * std::min(dx, dy);
-    // return dst / 2;
+
     unsigned long dx = ax > bx ? ax - bx : bx - ax;   // higher bit overflows not controlled
     unsigned long dy = ay > by ? ay - by : by - ay;   // coord values must be smaller than that
 
@@ -128,9 +126,16 @@ constexpr bool is_on_map(const map_t &map, const Coord point) noexcept
 }
 
 /// Encapsulates check whether map cell is occupied
-[[gnu::hot]] constexpr bool is_forbidden(const map_t &map, const Coord point) noexcept
+[[gnu::hot, gnu::always_inline]]
+constexpr inline bool is_forbidden(const map_t &map, const Coord point)
 {
     return false == map.get_value(point.x, point.y);     // already taken
+}
+
+[[gnu::hot, gnu::always_inline]]
+constexpr inline bool is_forbidden_raw(const map_t &map, const Coord point) noexcept
+{
+    return false == map.get_value_raw(point.x, point.y);     // already taken
 }
 
 /// Custom error used here
@@ -219,14 +224,14 @@ struct BBox {
     /// Rel coords have an interesting property of index always
     /// being upper bounded by: bbox_width * bbox_height
     [[gnu::hot, gnu::always_inline]]
-    constexpr inline size_t get_index(const RelCoord &rel) const
+    constexpr inline size_t get_index(const RelCoord &rel) const noexcept
     {
         // @TODO: efficiently check that we're not returning indices out of bonds
         return (size_t)rel.x + (size_t)rel.y * (size_t)most.x;
     }
 
     [[gnu::hot, gnu::always_inline]]
-    constexpr inline const RelCoord to_relative(const Coord &coord) const
+    constexpr inline const RelCoord to_relative(const Coord &coord) const noexcept
     {
         // @TODO: find an efficient way to check boundaries
         return {static_cast<bbox_sgn_t>(coord.x - base.x), 
@@ -234,7 +239,7 @@ struct BBox {
     }
 
     [[gnu::hot, gnu::always_inline]]
-    constexpr inline const Coord to_absolute(const RelCoord &coord) const
+    constexpr inline const Coord to_absolute(const RelCoord &coord) const noexcept
     {
         return {base.x + coord.x,
                 base.y + coord.y};
@@ -272,7 +277,7 @@ constexpr std::vector<types::PathEntry> reconstruct_path(
     const RelCoord &path_finish,
     const RelCoord &path_start,
     const BBox &bbox,
-    const std::vector<VisitedEntry> &visited)
+    const std::vector<VisitedEntry> &visited)   noexcept
 {
     LOG("Backtracing path ({}, {}) -> ({}, {})",
         path_finish.x, path_finish.y,path_start.x, path_start.y);
@@ -307,7 +312,7 @@ constexpr std::vector<types::PathEntry> reconstruct_path(
 
 
 constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEntry> &visited,
-                                   std::vector<Coord> &result)
+                                   std::vector<Coord> &result)  noexcept
 {
     utils::TimeIt _time_rec_visited{};
 
@@ -382,6 +387,12 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
     std::vector<VisitedEntry> visited;
     visited.assign(bbox.get_index(bbox.most) + 1,
                    VisitedEntry{.came_from = {0, 0}, .pure_dist = 0});
+
+    // AVX is good. But we need faster inits. So memset. Thug life
+    //std::memset(visited.data(), 0, visited.size() * sizeof(visited[0]));
+    //LOG("Memset size: {}, capacity: {}", visited.size(), visited.capacity());
+
+    // Add FROM point to visited
     visited[bbox.get_index(bbox.to_relative(from))] = {
         .came_from = bbox.to_relative(from),
         .pure_dist = 0
@@ -446,7 +457,10 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
             // @TODO: play with the order of checks
 
             // @TODO: check dist_metric
-            if (!bbox.is_inside(newcoord) || is_forbidden(map, bbox.to_absolute(newcoord))) {
+            // Note: is_forbidden_raw() is safe here as we're already ensuring map
+            //       boundaries with bbox. This allows to avoid repetitive check
+            if (!bbox.is_inside(newcoord) || is_forbidden_raw(map, bbox.to_absolute(newcoord))) {
+
                 continue;
             }
 
