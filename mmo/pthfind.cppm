@@ -26,65 +26,33 @@ import types;
 import common;
 
 export namespace pthfind {
+
 // Core type aliases
-/// Represents one coordinate: X or Y
-using axis_t = unsigned int;
-
-/// In pathfinding we are using relative coordinates inside bounding box
-/// This will allow to have shorter types and save some space.
-/// Relative coordinate inside bbox
-using bbox_t = uint16_t;
-
-/// Used to represent distance between two points
-/// Theoretically, octile dist_metric as implemented below
-/// gives max value of 181/2. Thus 32-bit value should be enough
-/// to store distances for fields up to 6888x6888
-/// This also needs not to be huge to save memory in vector tables
-/// (of dist_t x visited size)
-using dist_t = unsigned int;
-
+using types::axis_t;        ///< Represents one coordinate axis: X or Y
+using types::bbox_t;        ///< Relative coordinate axis inside bounding box
+using types::dist_t;        ///< Represents distance between two points
 
 // Derived types
+// Coordinate pair (X, Y) - base for two concrete types
+// using types::CoordBase;  // base not needed imported, use types::CoordBase
 
-/// The same width as bbox_t, but signed
-using bbox_sgn_t = std::make_signed_t<bbox_t>;
-
-/// Coordinate pair (X, Y) - base for two concrete types
-template <typename T>
-struct CoordBase {
-    using type = T;
-    type x;
-    type y;
-
-    constexpr inline bool is_zero() const
-    {
-        return !x && !y;
-    }
-
-    constexpr inline bool operator==(const CoordBase<T> &other) const noexcept
-    {
-        return x == other.x && y == other.y;
-    }
-};
-
-/// Represents coordinates on the whole map
-using Coord = CoordBase<axis_t>;
-static_assert(sizeof(Coord) == 2 * sizeof(axis_t),
-              "Coord struct not packed efficiently");
-
-/// When coordinates are uint16_t, it should get packed into one 32-bit value
-/// to ensure efficient storage and access.
-using RelCoord = CoordBase<bbox_sgn_t>;
-static_assert(sizeof(RelCoord) == 2 * sizeof(bbox_sgn_t),
-              "RelCoord struct not packed efficiently");
-
+using types::Coord;         ///< Absolute coordinates pair (X, Y) on the whole map
+using types::RelCoord;      ///< Relative coordinates pair [X, Y] inside bbox
+// When coordinates are int16_t, RelCoord should get packed into one 32-bit value
+// to ensure efficient storage and access.
 
 /// Map object abstraction
 using map_t = common::BinMask<axis_t>;      // @FIXME: probably BinMask shouldn't be templated
 
 /// Type representing move step. This needs to be signed
-using step_t = std::pair<bbox_sgn_t, bbox_sgn_t>;
+using step_t = std::pair<bbox_t, bbox_t>;
 
+/// Custom error used here
+class LookupError : public std::range_error {
+public:
+    explicit LookupError(const std::string &message)
+        : std::range_error(message) {}
+};
 
 /// Distance metric based on octile distance.
 /// Octile distance is computed as:
@@ -109,55 +77,14 @@ constexpr inline dist_t distance_octile(unsigned long ax, unsigned long ay,
 }
 
 /// Wrapper encapsulating the concrete dist metric computation method
-/// Hotter than any MILF next door, so keep it close
-template <typename B>
+/// Hotter than any MILF next door, so keep it close.
+/// We don't care what tag (absolute or relative kind) they have,
+/// but we should always compare apples to apples.
+template <typename B, typename Tag>
 [[gnu::hot, gnu::always_inline]]
-constexpr inline dist_t distance(const CoordBase<B> from, const CoordBase<B> to) noexcept
+constexpr inline dist_t distance(const types::CoordBase<B, Tag> from, const types::CoordBase<B, Tag> to) noexcept
 {
     return distance_octile(from.x, from.y, to.x, to.y);
-}
-
-/// Encapsulates map boundaries check
-constexpr bool is_on_map(const map_t &map, const Coord point) noexcept
-{
-    // don't check for point.x >= 0 && point.y >= 0
-    // since here we're dealing with unsigned types
-    return point.x < map.width && point.y < map.height;
-}
-
-/// Encapsulates check whether map cell is occupied
-[[gnu::hot, gnu::always_inline]]
-constexpr inline bool is_forbidden(const map_t &map, const Coord point)
-{
-    return false == map.get_value(point.x, point.y);     // already taken
-}
-
-[[gnu::hot, gnu::always_inline]]
-constexpr inline bool is_forbidden_raw(const map_t &map, const Coord point) noexcept
-{
-    return false == map.get_value_raw(point.x, point.y);     // already taken
-}
-
-/// Custom error used here
-class LookupError : public std::range_error {
-public:
-    explicit LookupError(const std::string &message)
-        : std::range_error(message) {}
-};
-
-// Utility function
-constexpr void ensure_coord_valid(const map_t &map, const Coord &point)
-{
-    if (!is_on_map(map, point)) {
-        throw LookupError(std::format(
-            "Coord ({}, {}) does not belong to map {}x{} or forbidden",
-            point.x, point.y, map.width, map.height));
-    }
-    if (is_forbidden(map, point)) {
-        throw LookupError(std::format(
-            "Coord ({}, {}) is forbidden",
-            point.x, point.y));
-    }
 }
 
 /// Moving steps, all possible combinations
@@ -196,6 +123,43 @@ template<size_t size>
 /*static */ const auto steps_dist = __make_distarr<steps.size()>(steps);
 
 
+/// Encapsulates map boundaries check
+constexpr bool is_on_map(const map_t &map, const Coord point) noexcept
+{
+    // don't check for point.x >= 0 && point.y >= 0
+    // since here we're dealing with unsigned types
+    return point.x < map.width && point.y < map.height;
+}
+
+/// Encapsulates check whether map cell is occupied
+[[gnu::hot, gnu::always_inline]]
+constexpr inline bool is_forbidden(const map_t &map, const Coord point)
+{
+    return false == map.get_value(point.x, point.y);     // already taken
+}
+
+[[gnu::hot, gnu::always_inline]]
+constexpr inline bool is_forbidden_raw(const map_t &map, const Coord point) noexcept
+{
+    return false == map.get_value_raw(point.x, point.y);     // already taken
+}
+
+// Utility function
+constexpr void ensure_coord_valid(const map_t &map, const Coord &point)
+{
+    if (!is_on_map(map, point)) {
+        throw LookupError(std::format(
+            "Coord ({}, {}) does not belong to map {}x{} or forbidden",
+            point.x, point.y, map.width, map.height));
+    }
+    if (is_forbidden(map, point)) {
+        throw LookupError(std::format(
+            "Coord ({}, {}) is forbidden",
+            point.x, point.y));
+    }
+}
+
+
 struct BBox {
     Coord base;     ///< absolute point (top leftmost) from which relative coords offset
     RelCoord most;  ///< relative coordinate defining bottom right boundary
@@ -204,8 +168,8 @@ struct BBox {
                   const bbox_t bbox_width, const bbox_t bbox_height)
         : base{(axis_t)std::max((long)from.x - bbox_width, 0L),
                (axis_t)std::max((long)from.y - bbox_height, 0L)},
-          most{static_cast<bbox_sgn_t>(bbox_width * 2 + 1),
-               static_cast<bbox_sgn_t>(bbox_height * 2 + 1)}
+          most{static_cast<bbox_t>(bbox_width * 2 + 1),
+               static_cast<bbox_t>(bbox_height * 2 + 1)}
         {}
 
     explicit BBox(const Coord &from, const bbox_t bbox_radius)
@@ -234,15 +198,15 @@ struct BBox {
     constexpr inline const RelCoord to_relative(const Coord &coord) const noexcept
     {
         // @TODO: find an efficient way to check boundaries
-        return {static_cast<bbox_sgn_t>(coord.x - base.x), 
-                static_cast<bbox_sgn_t>(coord.y - base.y)};
+        return {static_cast<bbox_t>(coord.x - base.x), 
+                static_cast<bbox_t>(coord.y - base.y)};
     }
 
     [[gnu::hot, gnu::always_inline]]
     constexpr inline const Coord to_absolute(const RelCoord &coord) const noexcept
     {
-        return {base.x + coord.x,
-                base.y + coord.y};
+        return {static_cast<bbox_t>(base.x + coord.x),
+                static_cast<bbox_t>(base.y + coord.y)};
     }
 };
 
@@ -322,8 +286,8 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
     for (size_t idx = 0; idx < bbox.get_index(bbox.most); idx++)
     {
         if (visited[idx].is_empty())  continue;
-        const RelCoord rel = {.x = (bbox_sgn_t)(idx % (size_t)bbox.most.x),
-                              .y = (bbox_sgn_t)(idx / (size_t)bbox.most.x)};
+        const RelCoord rel = {.x = (bbox_t)(idx % (size_t)bbox.most.x),
+                              .y = (bbox_t)(idx / (size_t)bbox.most.x)};
         result.emplace_back(bbox.to_absolute(rel));
     }
 
@@ -334,10 +298,15 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
 
 
 /// A* pathfinding implementation
-/// @param radius   Squircle radius limiting the area `from` starting point,
-///                 in which the lookup is performed.
-///                 When set to 0 (default) - no limits apply and
-///                 the whole map is traversed.
+/// @param map     Map on which to search for a path
+/// @param from    Absolute coordinates of the starting point on map
+/// @param to      Absolute coordinates of the end (finish) point on map
+/// @param radius  Squircle radius limiting the area `from` starting point,
+///                in which the lookup is performed.
+///                When set to 0 (default) - no limits apply and
+///                the whole map is traversed.
+/// @param set_visited (optional) When vector is passed, the visited set having
+///                all the (absolute) coordinates explored will be exported there
 /* export */ auto pathfind_astar(const map_t &map, const Coord from, const Coord to, const dist_t radius = 0,
                                  std::optional<std::reference_wrapper<std::vector<Coord>>> set_visited = std::nullopt)
 {
@@ -348,7 +317,7 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
     ensure_coord_valid(map, to);
 
     // Precompute maximum metric given the radius. This will be used in comparisons
-    const auto maxdist = distance(Coord{0, 0}, Coord{(dist_t)(radius), 0});
+    const auto maxdist = distance(Coord{0, 0}, Coord{(axis_t)(radius), 0});
 
     // Check that we're looking inside boundaries (if boundaries set)
     auto dist = distance(from, to);
@@ -444,8 +413,8 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
             const auto [dx, dy] = steps[i];          // should be more efficient
             const auto step_dist = steps_dist[i];    // than unpacking tuples of tuples
 
-            const RelCoord newcoord = { .x = static_cast<bbox_sgn_t>(el.coord.x + dx), 
-                                        .y = static_cast<bbox_sgn_t>(el.coord.y + dy) };
+            const RelCoord newcoord = { .x = static_cast<bbox_t>(el.coord.x + dx), 
+                                        .y = static_cast<bbox_t>(el.coord.y + dy) };
             
             // @TODO: find more optimal way for this check
             if (newcoord.x < 0 || newcoord.y < 0) {

@@ -3,7 +3,9 @@ module;     // Global module fragment
 #include <bitset>
 #include <cstdint>
 #include <exception>
+#include <format>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -24,6 +26,90 @@ concept pe_coord_constraint = (
 
 
 export namespace types {
+
+// Core types
+
+/// Represents one coordinate: X or Y.
+/// This should be a signed integer as:
+///   - it simplifies math and boundary checks;
+///   - our map uses center at (0, 0) so coords can be negative anyway.
+using axis_t = int16_t;
+
+/// Relative coordinate inside bounding box.
+/// Coordinates inside bbox are non-negative. But to simplify math checks
+/// and avoid dealing with integers overflows, it is better to have it signed.
+using bbox_t = axis_t;
+
+/// Used to represent distance between two points
+/// Octile distance metric, as implemented in project, returns maximum value
+/// of input_max * ceil[(128 + 53) / 2] = 91 * input_max
+/// This must not be huge to save memory in vector tables (of dist_t x visited size)
+using dist_t = uint32_t;
+
+static_assert(std::numeric_limits<dist_t>::max()
+              >= ( std::numeric_limits<axis_t>::max() * (128 + 53) ) / 2,
+              "dist_t is not wide enough to hold any axis_t distance");
+
+
+/// Enum classes are strongly typed. We use them to distinguish between
+/// two coordinate types, absolute Coord and relative RelCoord
+/// defined below. Both implemented as CoordBase, but should be made
+/// incompatible without explicit cast.
+enum class CoordTag_Absolute {};
+enum class CoordTag_Relative {};
+
+/// Coordinate pair (X, Y) - base for two concrete pair types below
+/// This should be used directly without subclassing
+template <typename T, typename Tag>
+struct CoordBase {
+    using type = T;
+    using kind = Tag;
+    T x;
+    T y;
+
+    [[gnu::hot, gnu::always_inline]]
+    constexpr inline bool is_zero() const noexcept
+    {
+        return !x && !y;
+    }
+
+    [[gnu::hot, gnu::always_inline]]
+    constexpr inline bool operator==(const CoordBase<T, Tag> &other) const noexcept
+    {
+        return x == other.x && y == other.y;
+    }
+
+    /// utility for nicer output and debugging experience
+    operator std::string() const noexcept
+    {
+        // use (x, y) for absolute and [x, y] for relative coords
+        return std::format(
+            std::is_same<Tag, CoordTag_Absolute>::value ?
+            "({}, {})" : "[{}, {}]", x, y);
+    }
+
+    friend std::ostream& operator<<(std::ostream &out, const CoordBase<T, Tag> &coord)
+    {
+        out << static_cast<std::string>(coord);
+        return out;
+    }
+};
+
+/// Coord represents *absolute* coordinates on the whole map
+/// See RelCoord below for relative coordinate type
+using Coord = CoordBase<axis_t, CoordTag_Absolute>;
+static_assert(sizeof(Coord) == 2 * sizeof(axis_t),
+              "Coord struct not packed efficiently");
+
+/// RelCoord represents coordinates *relative* to some basic point
+/// (normally inside a bbox map region).
+/// This way, even though Coord and RelCoord may use the same basic types inside,
+/// they mean different things and should be made explicitly distinct.
+/// Compiler should complain if the two are mixed together without explicit cast.
+using RelCoord = CoordBase<bbox_t, CoordTag_Relative>;
+static_assert(sizeof(RelCoord) == 2 * sizeof(bbox_t),
+              "RelCoord struct not packed efficiently");
+
 
 template <typename T = uint8_t>
 struct Stats {
@@ -247,99 +333,4 @@ public:
     }
 };
 
-
-template<typename T = int16_t>
-struct [[gnu::packed]] Coord {
-    T x;
-    T y;
-
-    Coord(const T x, const T y) : x(x), y(y) {}
-    
-    // TODO: fix conversions
-    template<typename P>
-    Coord(const std::pair<P, P> &pair) : Coord(pair.first, pair.second) {}
-
-    constexpr size_t hash() const noexcept
-    {
-        // std::hash-like must return size_t,
-        // for ints it usually returns the numbers itself
-        // That is why, rotate by half of size_t while combining them
-        auto hx = std::hash<decltype(x)>{}(x);
-        auto hy = std::hash<decltype(y)>{}(y);
-        // rotate by half
-        constexpr const auto rot = sizeof(size_t) * 4;
-        return ((hx << rot) | (hx >> rot)) ^ hy;
-    }
-
-    template<typename U = T>
-    bool operator==(const Coord<U> &other) const noexcept {
-        return (x == other.x) && (y == other.y);
-    }
-
-    operator std::string() const noexcept
-    {
-        return std::format("({}, {})", x, y);
-    }
-
-    /// Distance metric based on octile distance
-    /// Octile distance is computed as:
-    /// dst = max(Δx, Δy) + (√2​−1)⋅min(Δx,Δy)
-    /// We approximate with integer arithmetic as:
-    /// dst*128 = 128 * max(Δx, Δy) + 53 * min(Δx,Δy)
-    /// Should give us 0.03% error
-    constexpr unsigned long dist_metric(const Coord &other) const noexcept
-    {
-        // Don't use std::abs, std::min and std::max. Slow shit
-        // unsigned long dx = std::abs((long)this->x - (long)other.x);
-        // unsigned long dy = std::abs((long)this->y - (long)other.y);
-        // auto dst = 128 * std::max(dx, dy) + 53 * std::min(dx, dy);
-        unsigned long dx = x > other.x ? x - other.x : other.x - x;
-        unsigned long dy = y > other.y ? y - other.y : other.y - y;
-
-        auto dst = 128 * (dx > dy ? dx : dy) + 53 * (dx > dy ? dy : dx);
-
-        return dst / 2;     // dunno why, but /2 it is faster
-    }
-};
 }       // namespace types
-
-
-// (!) overloading std:: namespace is undefined behavior
-//     but we need this for structured binding to work
-export namespace std {
-// Specialization of std::tuple_size
-// Declares that Point<T> behaves like a tuple with 2 elements (x and y).
-template <typename T>
-struct tuple_size<types::Coord<T>> : std::integral_constant<std::size_t, 2> {};
-
-// Specialization of std::tuple_element
-// Defines the type of each element in Point<T>, making Point behave like a tuple.
-
-template<typename T, std::size_t I>
-struct tuple_element<I, types::Coord<T>> {
-    // or .y, both are the same type
-    using type = decltype(std::declval<types::Coord<T>>().x);
-};
-
-// Overload of std::get
-// Provides a way to access elements using std::get<I>(point)
-template<typename T, std::size_t I>
-constexpr auto get(const types::Coord<T> &obj) -> decltype(auto)
-{
-    if constexpr (I == 0) {
-        return obj.x;
-    } else if constexpr (I == 1) {
-        return obj.y;
-    }
-}
-
-// Custom specialization of std::hash
-template<typename T>
-struct hash<types::Coord<T>>
-{
-    size_t operator()(const types::Coord<T> &coord) const noexcept
-    {
-        return coord.hash();    // delegate to own method
-    }
-};
-};   // namespace std

@@ -81,7 +81,7 @@ public:
     size_t num_set_bits();
 
     // returns coordinates of i-th non-zero element
-    Coord<T> get_coord_nonzero(const size_t elnum);
+    Coord get_coord_nonzero(const size_t elnum);
 
 private:
     void _set_indices();
@@ -151,7 +151,7 @@ size_t IndexedBinMask<T>::num_set_bits()
 
 
 template <typename T>
-Coord<T> IndexedBinMask<T>::get_coord_nonzero(const size_t elnum)
+Coord IndexedBinMask<T>::get_coord_nonzero(const size_t elnum)
 {
     auto totalnum = this->num_set_bits();
 
