@@ -44,7 +44,6 @@ all: | $(bdir)/main main
 
 # Test dependencies
 $(bdir)/test_pthfind: $(call pcm,err types utils common pthfind)
-$(bdir)/test_pathfind_algo: $(call pcm,utils common types)
 $(bdir)/test_path: $(call pcm,types)
 $(bdir)/test_rnd: $(call pcm,rnd)
 $(bdir)/test_binmask: $(call pcm,utils common)
