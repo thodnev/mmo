@@ -280,10 +280,12 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
 {
     utils::TimeIt _time_rec_visited{};
 
+    const size_t maxidx = bbox.get_index(bbox.most);
+    
     result.clear();
-    result.reserve(bbox.get_index(bbox.most));  // alloc with excess
+    result.reserve(maxidx);  // alloc with excess
 
-    for (size_t idx = 0; idx < bbox.get_index(bbox.most); idx++)
+    for (size_t idx = 0; idx < maxidx; idx++)
     {
         if (visited[idx].is_empty())  continue;
         const RelCoord rel = {.x = (bbox_t)(idx % (size_t)bbox.most.x),
@@ -343,10 +345,10 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
         // {(bbox_sgn_t)std::max((long)to.x - bbox_base.x, 0L),
         // (bbox_sgn_t)std::max((long)to.y - bbox_base.y, 0L)};
 
-        LOG("Set bbox base to: ({}, {})", bbox_base.x, bbox_base.y);
-        LOG("Bbox most boundary: ({}, {})", bbox_most.x, bbox_most.y);
-        LOG("Transformed FROM ({}, {}) -> ({}, {})", from.x, from.y, bbox_from.x, bbox_from.y);
-        LOG("Transformed TO ({}, {}) -> ({}, {})", to.x, to.y, bbox_to.x, bbox_to.y);
+        LOG("Set bbox base to: {}", bbox_base);
+        LOG("Bbox most boundary: {}", bbox_most);
+        LOG("Transformed FROM {} -> {}", from, bbox_from);
+        LOG("Transformed TO {} -> {}", to, bbox_to);
         LOG("Original distance: {}, transformed distance: {}",
             distance(from, to), distance(bbox_from, bbox_to));
 
@@ -383,6 +385,7 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
                         });
 
     const auto bboxed_to = bbox.to_relative(to);
+    [[maybe_unused]] const auto bboxed_from = bbox.to_relative(from);
     
     // start traversal
     _time_init.report_took("initialization");
@@ -423,12 +426,15 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
 
             const auto new_pure_dist = el.pure_dist + step_dist;
 
-            // @TODO: play with the order of checks
+            // Check that we're inside bbox first before checking visited. This way
+            // the check comes for free. Otherwise we risk indexing out of bonds
 
             // @TODO: check dist_metric
             // Note: is_forbidden_raw() is safe here as we're already ensuring map
             //       boundaries with bbox. This allows to avoid repetitive check
-            if (!bbox.is_inside(newcoord) || is_forbidden_raw(map, bbox.to_absolute(newcoord))) {
+            if (//distance(bboxed_from, newcoord) > maxdist   ||
+                !bbox.is_inside(newcoord)
+                || is_forbidden_raw(map, bbox.to_absolute(newcoord))) {
 
                 continue;
             }
@@ -443,6 +449,9 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
             visited[idx].came_from = el.coord;
             
             const HeapEntry newel = {
+                // if we use new_pure + mul * distance here,
+                // with mul -> 0 we're getting closer to Dijkstra
+                // with mul > 1 we're getting closer to greedy breadth-first
                 .total_dist = new_pure_dist + distance(newcoord, bboxed_to),
                 .pure_dist = new_pure_dist,
                 .coord = newcoord

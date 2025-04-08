@@ -13,8 +13,9 @@ CXXFLAGS += -std=c++2c -I$(pdir) -fprebuilt-module-path=$(bdir)/
 CXXFLAGS += -O3 -flto -Wall -Wextra -ggdb3 #-pg
 LDFLAGS = -std=c++2c -O3 -flto -I$(pdir) -fprebuilt-module-path=$(bdir)/ -ggdb3 # -pg
 LDLIBS = $(shell pkg-config libpng --libs)
-# CXXFLAGS += -DDEBUG
-# LDFLAGS += -DDEBUG
+# LDLIBS = -Ldeps/libpng -l:libpng.a -lz
+CXXFLAGS += -DDEBUG
+LDFLAGS += -DDEBUG
 
 # build directory
 bdir := .build
@@ -57,7 +58,7 @@ $(bdir)/main.o: $(pcm_modules)
 $(bdir)/main: LDFLAGS += 
 
 $(bdir)/main: $(obj_files) $(pcm_modules) | $(bdir)
-	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(bdir)/png_wrap.o: CXXFLAGS += $(shell pkg-config libpng --cflags)
 #$(bdir)/png_wrap: LDFLAGS += $(shell pkg-config libpng --libs)
@@ -86,7 +87,7 @@ $(bdir)/%.o: $(pdir)/%.cpp | $(bdir)
 
 # Tests
 $(bdir)/test_%: $(call tst, %) | $(bdir)
-	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 test_%: $(bdir)/test_%
 	@echo -n "Running "

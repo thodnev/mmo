@@ -1,5 +1,7 @@
 module;     // Global module fragment
 #include <array>
+#include <algorithm>
+#include <iterator>
 #include <bitset>
 #include <cstdint>
 #include <exception>
@@ -334,3 +336,20 @@ public:
 };
 
 }       // namespace types
+
+
+
+// Specializations
+
+// std::format for POD types
+// I see no other way of doing it, other than specializing for every POD type
+// As making it generic requires introducing virtual methods, they take
+// space in vtable and child subclasses won't be POD anymore
+template <typename T, typename Tag>
+struct std::formatter<types::CoordBase<T, Tag>> : std::formatter<std::string> {
+    auto format(const types::CoordBase<T, Tag> &obj, format_context &ctx) const
+    {
+        std::string conv = obj;
+        return std::move(conv.begin(), conv.end(), ctx.out());
+    }
+};
