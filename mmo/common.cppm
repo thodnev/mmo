@@ -1,17 +1,15 @@
 module;
 #include "macro.hpp"
 #include "png_wrap.hpp"
-#include "utils.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <limits>
 #include <variant>
 #include <vector>
 
-//#include <iostream>
-export module common;
-
 import types;
+import utils;
+export module common;
 
 export namespace common {
     using types::Coord;   // Make available in this namespace

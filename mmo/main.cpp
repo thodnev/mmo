@@ -1,10 +1,10 @@
 #include "png_wrap.hpp"
-#include "utils.hpp"
-
 #include <cstdint>
 #include <iostream>
 
 import common;
+import err;
+import utils;
 //import rnd;
 //import types;
 
@@ -25,6 +25,7 @@ int main(const int argc, char * const argv[])
     // std::cout << "Flat 1s: " << utils::count_bits(flat) << std::endl;
     // std::cout << "DONE" << std::endl;
 
+    throw err::Error("Project not ready yet. {} != {}", true, false);
 
     return 0;
 }

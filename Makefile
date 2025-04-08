@@ -4,8 +4,8 @@ MAKEFLAGS += --jobs=$(shell nproc)
 
 .PHONY:	all clean run test_%
 
-modules := types common rnd pthfind
-objs := main png_wrap utils
+modules := err utils types common rnd pthfind
+objs := main png_wrap
 tests := rnd
 
 CXX = clang++
@@ -43,14 +43,15 @@ obj_files := $(call obj,$(objs))
 all: | $(bdir)/main main
 
 # Test dependencies
-$(bdir)/test_pthfind: $(call obj,utils) $(call pcm,common types pthfind)
-$(bdir)/test_pathfind_algo: $(call obj,utils) $(call pcm,common types)
+$(bdir)/test_pthfind: $(call pcm,err types utils common pthfind)
+$(bdir)/test_pathfind_algo: $(call pcm,utils common types)
 $(bdir)/test_path: $(call pcm,types)
 $(bdir)/test_rnd: $(call pcm,rnd)
-$(bdir)/test_binmask: $(call pcm,common) $(call obj,utils)
+$(bdir)/test_binmask: $(call pcm,utils common)
 
 # Intermodule dependencies
-$(call pcm,common): | $(call pcm,types)
+$(call pcm,types): | $(call pcm,err)
+$(call pcm,common): | $(call pcm,types utils)
 $(call pcm,pthfind): | $(call pcm,common)
 
 # General dependencies

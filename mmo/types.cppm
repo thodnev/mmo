@@ -15,6 +15,7 @@ module;     // Global module fragment
 #include <utility>
 #include <vector>
 
+import err;
 export module types;
 
 /// Coordinate delta constraint
@@ -25,7 +26,6 @@ concept pe_coord_constraint = (
     std::is_integral<T>::value && std::is_signed<T>::value
     && (-1 <= T{} && T{} <= 1)
 );
-
 
 export namespace types {
 
@@ -254,13 +254,13 @@ public:
         //                            && !(dX == 0 && dY == 0));
         // static_assert(is_valid, "(dX, dY) must be in range [-1, 1] and cannot be (0, 0)");
         
-        [[unlikely]] if (dX < -1 || dY < -1 || dX > 1 || dY > 1
-                         || (dX == 0 && dY == 0)) {
-            throw std::out_of_range(
-                "(dX, dY) must be in range [-1, 1] and cannot be (0, 0)");
+        [[unlikely]] if (dX < -1 || dY < -1 || dX > 1 || dY > 1 || (dX == 0 && dY == 0)) {
+            throw err::BoundsError(
+                "(dX={}, dY={}) must be in range [-1, 1] and cannot be (0, 0)",
+                dX, dY);
         }
 
-        return bset_t(_dxdy_to_index(dX, dY));
+        [[likely]] return bset_t(_dxdy_to_index(dX, dY));
     }
 
     operator std::string() const {

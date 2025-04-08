@@ -1,5 +1,9 @@
 # MMO TODO
 
+## Data structures
+
+- [ ] Refactor `PathEntry` to make it more efficient
+
 ## Pathfinding
 
 Higher-order tasks:
@@ -37,3 +41,8 @@ Concrete tasks:
             make public.
 - [ ] OR (*better*) make a Python binding. Maybe ship as a separate package
       to benefit from open source collective participation;
+
+
+## Tools
+
+- [ ] Refactor `TimeIt` to make it excludable at compile-time

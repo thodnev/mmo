@@ -8,7 +8,6 @@ module;
 #include <boost/heap/fibonacci_heap.hpp>
 
 #include "macro.hpp"
-#include "utils.hpp"
 
 #include <algorithm>
 #include <array>
@@ -20,10 +19,10 @@ module;
 #include <utility>
 #include <vector>
 
-
-export module pthfind;
 import types;
+import utils;
 import common;
+export module pthfind;
 
 export namespace pthfind {
 
