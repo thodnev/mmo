@@ -254,7 +254,8 @@ public:
         //                            && !(dX == 0 && dY == 0));
         // static_assert(is_valid, "(dX, dY) must be in range [-1, 1] and cannot be (0, 0)");
         
-        [[unlikely]] if (dX < -1 || dY < -1 || dX > 1 || dY > 1 || (dX == 0 && dY == 0)) {
+        if (dX < -1 || dY < -1 || dX > 1 || dY > 1 || (dX == 0 && dY == 0))
+        [[unlikely]] {
             throw err::BoundsError(
                 "(dX={}, dY={}) must be in range [-1, 1] and cannot be (0, 0)",
                 dX, dY);

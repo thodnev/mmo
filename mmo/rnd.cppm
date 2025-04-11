@@ -31,15 +31,15 @@ public:
     T random(T from = std::numeric_limits<T>::min(),
              T to = std::numeric_limits<T>::max())
     {
-        [[unlikely]] if (from == to) return from;
-        [[unlikely]] if (from > to) std::swap(from, to);
+        if (from == to) [[unlikely]] return from;
+        if (from > to)  [[unlikely]] std::swap(from, to);
 
         auto maxval = std::numeric_limits<T>::max();
         auto range = to - from;
         auto maxdiv = maxval - (maxval % range);
 
         auto rnd = randval();
-        [[unlikely]] while (rnd > maxdiv) {    // discard
+        while (rnd > maxdiv) [[unlikely]] {    // discard
             rnd = randval();      // regenerate
         }
 
