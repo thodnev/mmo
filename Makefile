@@ -4,7 +4,7 @@ MAKEFLAGS += --jobs=$(shell nproc)
 
 .PHONY:	all clean run test_%
 
-modules := err utils types common rnd pthfind
+modules := err utils types common rnd pthfind entity
 objs := main png_wrap
 tests := rnd
 
@@ -43,6 +43,7 @@ obj_files := $(call obj,$(objs))
 all: | $(bdir)/main main
 
 # Test dependencies
+$(bdir)/test_entity: $(call pcm,entity)
 $(bdir)/test_pthfind: $(call pcm,err types utils common pthfind)
 $(bdir)/test_path: $(call pcm,types)
 $(bdir)/test_rnd: $(call pcm,rnd)
