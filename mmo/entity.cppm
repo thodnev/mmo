@@ -6,6 +6,7 @@ module;
 #include <sstream>
 #include <tuple>
 #include <vector>
+#include <utility>
 
 import err;
 
@@ -49,39 +50,45 @@ struct StatsCommon {
 
     T LUK = 0;       ///< Luck
     T INS = 0;       ///< Insanity
-    
-    constexpr auto to_tuple() const noexcept
+
+    constexpr StatsCommon(const T str, const T int_, const T dex, const T con,
+                          const T wis, const T agi, const T luk, const T ins)
+        : STR(str), INT(int_), DEX(dex), CON(con), WIS(wis), AGI(agi), LUK(luk), INS(ins) {}
+
+    constexpr StatsCommon() = default;
+
+    constexpr bool operator==(const StatsCommon<T> &r) const noexcept
     {
-        return std::make_tuple(STR, INT, DEX, CON, WIS, AGI, LUK, INS);
+        return ((STR == r.STR) && (INT == r.INT) && (DEX == r.DEX) && (CON == r.CON)
+             && (WIS == r.WIS) && (AGI == r.AGI) && (LUK == r.LUK) && (INS == r.INS));
     }
 
-    constexpr auto to_pairs() const noexcept
+    /// Flat array representation of the fields in order
+    constexpr const std::array<type, size> values() const noexcept
     {
-        // make_named_tuple(std::make_index_sequence<size>{});
-
-        constexpr auto values = this->to_tuple();
-
-        auto make_pairs = [&]<std::size_t... Is>(std::index_sequence<Is...>) constexpr {
-            return std::make_tuple(
-                std::make_pair(field_names[Is], std::get<Is>(values))...
-            );
-        };
-        
-        return make_pairs(std::make_index_sequence<size>{});
+        return {STR, INT, DEX, CON, WIS, AGI, LUK, INS};
     }
 
+    /// Converts to string with a specified delimeter
+    /// @param sep delimiter to place between separate fields
     constexpr const std::string to_string(const std::string &sep = ", ") const noexcept
     {
+        const auto vals = values();
         std::ostringstream out;
-        out << "@FIXME" << sep;
+        for (size_t idx = 0; idx < vals.size(); idx++) {
+            out << field_names[idx] << ": " << static_cast<unsigned int>(vals[idx]);
+            if (idx < vals.size() - 1)  out << sep;
+        }
         return out.str();
     }
 
+    /// Allow direct casting to string, uses default delimeter from `to_string()`
     operator std::string() const noexcept
     {
         return to_string();
     }
 
+    /// Allow output to ostream
     friend std::ostream& operator<<(std::ostream &out, const StatsCommon &obj)
     {
         out << static_cast<std::string>(obj);
@@ -91,21 +98,32 @@ struct StatsCommon {
 
 
 struct BaseStats : public StatsCommon<uint8_t> {
+    using StatsCommon<type>::StatsCommon;    // inherit constructor
+
     constexpr packed_t to_packed() const noexcept
     {
-        packed_t vec = {STR, INT, DEX, CON, WIS, AGI, LUK, INS};
+        const auto vals = this->values();
+        packed_t vec(vals.begin(), vals.end());
         return vec;
     }
 
-    // constexpr static BaseStats from_packed(const packed_t &data)
-    // {
-    //     if (size != data.size()) [[unlikely]] {
-    //         throw err::ValueError(:REPLACEME);
-    //     }
+    constexpr static BaseStats from_packed(const packed_t &data)
+    {
+        // const auto tup = utils::vector_to_tuple<size>(data);
+        // return std::apply([](auto &&...args) { return BaseStats(args...); },
+        //                tup);
 
-    //     BaseStats res = data;
-    //     return res;
-    // }
+        if (size != data.size()) [[unlikely]] {
+            throw err::ValueError("Unpacking size mismatch: expected {}, got {}",
+                size, data.size());
+        }
+
+        const auto built = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return BaseStats(data[Is]...);
+        }(std::make_index_sequence<size>{});
+
+        return built;
+    }
 };
 
 

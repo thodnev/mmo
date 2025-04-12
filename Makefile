@@ -50,9 +50,11 @@ $(bdir)/test_rnd: $(call pcm,rnd)
 $(bdir)/test_binmask: $(call pcm,utils common)
 
 # Intermodule dependencies
+$(call pcm,entity): | $(call pcm,err)
 $(call pcm,types): | $(call pcm,err)
 $(call pcm,common): | $(call pcm,types utils)
 $(call pcm,pthfind): | $(call pcm,common)
+$(call pcm,utils): | $(call pcm,err)
 
 # General dependencies
 $(bdir)/main.o: $(pcm_modules)

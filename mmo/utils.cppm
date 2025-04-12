@@ -12,6 +12,7 @@ module;
 #include <iostream>
 #include <string>
 
+import err;
 export module utils;
 export namespace utils {
 
@@ -188,5 +189,18 @@ public:
         out << "TIMEIT: " << msg << "took " << res << std::endl;
     }
 };
+
+
+template <size_t size, typename T>
+auto vector_to_tuple(const std::vector<T> &vec)
+{
+    if (size != vec.size()) [[unlikely]] {
+        throw err::LookupError("size mismatch: expected {}, got {}", size, vec.size());
+    }
+
+    return [&]<size_t... Is> (std::index_sequence<Is...>) constexpr {
+        return std::make_tuple(vec[Is]...);
+    }(std::make_index_sequence<size>{});
+}
 
 }   // namespace
