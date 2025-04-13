@@ -7,6 +7,8 @@ void test_basic(std::ostream &out)
 {
     // create
     entity::BaseStats base = {10, 20, 30, 0, 0, 0, 0, 69};
+    // size
+    out << "BaseStats size: " << sizeof(base) << "\n";
     // output
     out << base << "\n";
     // pack
@@ -20,8 +22,21 @@ void test_basic(std::ostream &out)
     const auto unpacked = entity::BaseStats::from_packed(packed);
     out << "Unpacked " << unpacked << "\n";
 
-    out << "unpacked == base >> " << (unpacked == base) << "\n";
-    out << "unpacked != base >> " << (unpacked != base) << "\n";
+    //out << std::boolalpha;
+    out << "unpacked == base -> " << (unpacked == base) << "\n";
+    out << "unpacked != base -> " << (unpacked != base) << "\n";
+
+    // now StatsDiff
+    out << "\n";
+    entity::StatsDiff one = {165, 96, 69, 0, 10, 20, 30, 40};
+    entity::StatsDiff two = {96, 27, 69, 0, 1, 2, 3, 4};
+    out << "StatsDiff size: " << sizeof(one) << "\n";
+    out << "ONE:     " << one << "\n";
+    out << "TWO:     " << two << "\n";
+
+    auto sum = one + two;
+    out << "ONE+TWO: " << sum << "\n";
+    out << "ONE-TWO: " << (one - two) << "\n";
 }
 
 int main(const int argc, char * const argv[])

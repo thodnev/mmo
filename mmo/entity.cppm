@@ -2,9 +2,9 @@ module;
 #include <array>
 #include <concepts>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <sstream>
-#include <tuple>
 #include <vector>
 #include <utility>
 
@@ -57,6 +57,14 @@ struct StatsCommon {
 
     constexpr StatsCommon() = default;
 
+    // constexpr StatsCommon(const std::array<type, size> &arr) noexcept
+    // // stupid, but avoids overhead
+    // : STR(arr[0]), INT(arr[1]), DEX(arr[2]), CON(arr[3]),
+    //   WIS(arr[4]), AGI(arr[5]), LUK(arr[6]), INS(arr[7]) {}
+
+    constexpr StatsCommon(const std::array<type, size> &arr) noexcept
+        : StatsCommon(from_array(arr)) {}
+
     constexpr bool operator==(const StatsCommon<T> &r) const noexcept
     {
         return ((STR == r.STR) && (INT == r.INT) && (DEX == r.DEX) && (CON == r.CON)
@@ -94,6 +102,16 @@ struct StatsCommon {
         out << static_cast<std::string>(obj);
         return out;
     }
+
+protected:
+    static constexpr StatsCommon from_array(const std::array<type, size> &arr) noexcept
+    {
+        const auto built = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return StatsCommon(arr[Is]...);
+        }(std::make_index_sequence<size>{});
+
+        return built;
+    }
 };
 
 
@@ -107,7 +125,7 @@ struct BaseStats : public StatsCommon<uint8_t> {
         return vec;
     }
 
-    constexpr static BaseStats from_packed(const packed_t &data)
+    static constexpr BaseStats from_packed(const packed_t &data)
     {
         // const auto tup = utils::vector_to_tuple<size>(data);
         // return std::apply([](auto &&...args) { return BaseStats(args...); },
@@ -115,16 +133,49 @@ struct BaseStats : public StatsCommon<uint8_t> {
 
         if (size != data.size()) [[unlikely]] {
             throw err::ValueError("Unpacking size mismatch: expected {}, got {}",
-                size, data.size());
+                                  size, data.size());
         }
 
-        const auto built = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return BaseStats(data[Is]...);
-        }(std::make_index_sequence<size>{});
-
-        return built;
+        std::array<type, size> arr;
+        std::copy(data.begin(), data.end(), arr.begin());
+        return BaseStats(arr);
     }
 };
+static_assert(sizeof(BaseStats) == BaseStats::size * sizeof(BaseStats::type),
+              "BaseStats struct entries are not stored efficiently");
+static_assert(Packable<BaseStats>,
+              "BaseStats does not adhere to the Packabe interface");
 
 
+struct StatsDiff : public StatsCommon<int16_t> {
+    using StatsCommon<type>::StatsCommon;    // inherit constructor
+
+    constexpr StatsDiff operator+(const StatsDiff &r) const noexcept
+    {
+        return from_operator(r, std::plus<type>{});
+    }
+
+    // @TODO:
+    //constexpr StatsDiff& operator+=(const StatsDiff &r) noexcept
+
+    constexpr StatsDiff operator-(const StatsDiff &r) const noexcept
+    {
+        return from_operator(r, std::minus<type>{});
+    }
+
+    // @TODO:
+    //constexpr StatsDiff& operator-=(const StatsDiff &r) noexcept
+
+private:
+    template <typename Func>
+    constexpr StatsDiff from_operator(const StatsDiff &other, Func func) const noexcept
+    {
+        const auto oth = other.values();
+        auto res = this->values();
+        for (size_t idx = 0; idx < res.size(); idx++) {
+            res[idx] = func(res[idx], oth[idx]);
+        }
+        return StatsDiff(res);
+    }
+};
 }   // namespace
