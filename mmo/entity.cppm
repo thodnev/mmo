@@ -1,9 +1,11 @@
 module;
 #include <array>
+#include <algorithm>
 #include <concepts>
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <span>
 #include <sstream>
 #include <vector>
 #include <utility>
@@ -16,15 +18,16 @@ export module entity;
 
 // @TODO: find a better name for it
 /// Represents data serialization result
-using packed_t = std::vector<uint8_t>;
+using bytevec = std::vector<uint8_t>;
+using bytepack = std::span<const uint8_t>;
 
 /// Constraint for a class to be considered Packabe (serializable)
 template <typename T>
-concept Packable = requires(T a, const packed_t &data) {
-    /// Must have instance method to_packed() returning packed_t
-    { a.to_packed() } -> std::same_as<packed_t>;
+concept Packable = requires(T a, const bytepack &data) {
+    /// Must have instance method to_packed() returning bytevec
+    { a.to_packed() } -> std::same_as<bytevec>;
 
-    /// Must have class method from_packed(packed_t &) returning an object instance 
+    /// Must have class method from_packed(bytepack &) returning an object instance 
     { T::from_packed(data) } -> std::same_as<T>;
 };
 
@@ -72,7 +75,7 @@ struct StatsCommon {
     }
 
     /// Flat array representation of the fields in order
-    constexpr const std::array<type, size> values() const noexcept
+    constexpr std::array<type, size> values() const noexcept
     {
         return {STR, INT, DEX, CON, WIS, AGI, LUK, INS};
     }
@@ -118,14 +121,13 @@ protected:
 struct BaseStats : public StatsCommon<uint8_t> {
     using StatsCommon<type>::StatsCommon;    // inherit constructor
 
-    constexpr packed_t to_packed() const noexcept
+    constexpr bytevec to_packed() const noexcept
     {
         const auto vals = this->values();
-        packed_t vec(vals.begin(), vals.end());
-        return vec;
+        return bytevec(vals.begin(), vals.end());
     }
 
-    static constexpr BaseStats from_packed(const packed_t &data)
+    static constexpr BaseStats from_packed(const bytepack &data)
     {
         // const auto tup = utils::vector_to_tuple<size>(data);
         // return std::apply([](auto &&...args) { return BaseStats(args...); },
@@ -172,9 +174,12 @@ private:
     {
         const auto oth = other.values();
         auto res = this->values();
-        for (size_t idx = 0; idx < res.size(); idx++) {
-            res[idx] = func(res[idx], oth[idx]);
-        }
+
+        // apply func(res[i], oth[i]) and store result into res[i]
+        // i.e. for func(a[i], b[i]) -> result[i] the call pattern is:
+        //      (a.begin(), a.end(), b.begin(), result.begin(), func)
+        std::transform(res.begin(), res.end(), oth.begin(), res.begin(), func);
+
         return StatsDiff(res);
     }
 };
