@@ -35,43 +35,43 @@ export namespace entity {
 // Entity (Character, Monster, NPC) related data structures
 
 
-
+/// A base class for BaseStats and StatsDiff implementations below
 template <typename T>
 struct StatsCommon {
-    using type = T;  ///< Make available in subclasses as simple alias
     static constexpr size_t size = 8;   ///< Number of elements to simplify access
     static constexpr std::array<std::string, size> field_names = {
         "STR", "INT", "DEX", "CON", "WIS", "AGI", "LUK", "INS"};
+    using type = T;  ///< Make available in subclasses as simple alias
+    using arr_t = std::array<type, size>;     ///< Alias to underlying array view
 
-    T STR = 0;       ///< Strength
-    T INT = 0;       ///< Intelligence
-    T DEX = 0;       ///< Dexterity
+    union {
+        struct {
+            T STR = 0;       ///< Strength
+            T INT = 0;       ///< Intelligence
+            T DEX = 0;       ///< Dexterity
 
-    T CON = 0;       ///< Constitution
-    T WIS = 0;       ///< Wisdom
-    T AGI = 0;       ///< Agility
+            T CON = 0;       ///< Constitution
+            T WIS = 0;       ///< Wisdom
+            T AGI = 0;       ///< Agility
 
-    T LUK = 0;       ///< Luck
-    T INS = 0;       ///< Insanity
+            T LUK = 0;       ///< Luck
+            T INS = 0;       ///< Insanity
+        };
+        /// Flat array representation of the fields in order
+        arr_t as_array;
+    };
 
     constexpr StatsCommon(const T str, const T int_, const T dex, const T con,
-                          const T wis, const T agi, const T luk, const T ins)
+                          const T wis, const T agi, const T luk, const T ins) noexcept
         : STR(str), INT(int_), DEX(dex), CON(con), WIS(wis), AGI(agi), LUK(luk), INS(ins) {}
+
+    constexpr StatsCommon(const arr_t &arr) noexcept : as_array(arr) {}
 
     constexpr StatsCommon() = default;
 
-    // constexpr StatsCommon(const std::array<type, size> &arr) noexcept
-    // // stupid, but avoids overhead
-    // : STR(arr[0]), INT(arr[1]), DEX(arr[2]), CON(arr[3]),
-    //   WIS(arr[4]), AGI(arr[5]), LUK(arr[6]), INS(arr[7]) {}
-
-    constexpr StatsCommon(const std::array<type, size> &arr) noexcept
-        : StatsCommon(from_array(arr)) {}
-
     constexpr bool operator==(const StatsCommon<T> &r) const noexcept
     {
-        return ((STR == r.STR) && (INT == r.INT) && (DEX == r.DEX) && (CON == r.CON)
-             && (WIS == r.WIS) && (AGI == r.AGI) && (LUK == r.LUK) && (INS == r.INS));
+        return as_array == r.as_array;
     }
 
     /// Flat array representation of the fields in order
@@ -84,17 +84,19 @@ struct StatsCommon {
     /// @param sep delimiter to place between separate fields
     constexpr const std::string to_string(const std::string &sep = ", ") const noexcept
     {
-        const auto vals = values();
+        std::string buf(128, '\0');     // Preallocate. Expected out len 86..94
         std::ostringstream out;
-        for (size_t idx = 0; idx < vals.size(); idx++) {
-            out << field_names[idx] << ": " << static_cast<unsigned int>(vals[idx]);
-            if (idx < vals.size() - 1)  out << sep;
+        out.str(buf);       // set buffer
+
+        for (size_t idx = 0; idx < this->as_array.size(); idx++) {
+            out << field_names[idx] << ": " << +this->as_array[idx];
+            if (idx < this->as_array.size() - 1)  out << sep;
         }
         return out.str();
     }
 
     /// Allow direct casting to string, uses default delimeter from `to_string()`
-    operator std::string() const noexcept
+    constexpr operator std::string() const noexcept
     {
         return to_string();
     }
@@ -105,26 +107,16 @@ struct StatsCommon {
         out << static_cast<std::string>(obj);
         return out;
     }
-
-protected:
-    static constexpr StatsCommon from_array(const std::array<type, size> &arr) noexcept
-    {
-        const auto built = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return StatsCommon(arr[Is]...);
-        }(std::make_index_sequence<size>{});
-
-        return built;
-    }
 };
 
 
+/// Stores Base stats of the entity
 struct BaseStats : public StatsCommon<uint8_t> {
     using StatsCommon<type>::StatsCommon;    // inherit constructor
 
     constexpr bytevec to_packed() const noexcept
     {
-        const auto vals = this->values();
-        return bytevec(vals.begin(), vals.end());
+        return bytevec(this->as_array.begin(), this->as_array.end());
     }
 
     static constexpr BaseStats from_packed(const bytepack &data)
@@ -172,8 +164,8 @@ private:
     template <typename Func>
     constexpr StatsDiff from_operator(const StatsDiff &other, Func func) const noexcept
     {
-        const auto oth = other.values();
-        auto res = this->values();
+        const auto &oth = other.as_array;
+        auto res = this->as_array;
 
         // apply func(res[i], oth[i]) and store result into res[i]
         // i.e. for func(a[i], b[i]) -> result[i] the call pattern is:

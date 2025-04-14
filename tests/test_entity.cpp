@@ -1,6 +1,8 @@
 #include <iostream>
 #include <format>
 
+#include <cstdint>
+
 import entity;
 
 void test_basic(std::ostream &out)
@@ -11,6 +13,22 @@ void test_basic(std::ostream &out)
     out << "BaseStats size: " << sizeof(base) << "\n";
     // output
     out << base << "\n";
+
+    out << "BaseStats output as array:\n";
+    for (const auto &el : base.as_array) {
+        out << +el << " ";
+    }
+    out << "\n";
+
+    out << "Setting element as array\n";
+    auto &arr = base.as_array;
+    arr[0] = 69; arr[1] = 96; arr[2] = 0; arr[3] = 0;
+    out << base << "\n";
+
+    out << "Setting element by .dot\n";
+    base.STR = 99;
+    out << base << "\n";
+
     // pack
     auto packed = base.to_packed();
     out << "Packed: ";
@@ -37,7 +55,14 @@ void test_basic(std::ostream &out)
     auto sum = one + two;
     out << "ONE+TWO: " << sum << "\n";
     out << "ONE-TWO: " << (one - two) << "\n";
+
+    out << "Original objects after math:\n";
+    out << "ONE: " << one << "\n" << "TWO: " << two << "\n";
+
+    out << "Accessing separate values\n";
+    out << "STR: " << sum.STR << ", INT: " << sum.INT << "\n";
 }
+
 
 int main(const int argc, char * const argv[])
 {
