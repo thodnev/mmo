@@ -7,13 +7,89 @@ module;
 #include <variant>
 #include <vector>
 
+import err;
 import types;
 import utils;
 export module common;
 
 export namespace common {
-    using types::Coord;   // Make available in this namespace
 
+using types::Coord;   // Make available in this namespace
+
+
+/// Interface defining common core functionality required from all BinMask classes
+class MaskLike {
+public:
+    // 16 bits should be enough for holding up to 4 GiB binary images
+    using dim_t = uint16_t;    ///< Dimension type alias
+
+    dim_t width, height;       ///< Actual dimensions
+
+    virtual ~MaskLike() =0;    ///< Important for proper cleanup in derived classes
+
+    /// *abstract* Returns pixel at coordinates without checking for bounds
+    virtual constexpr bool get_value_raw(const dim_t x, const dim_t y) const noexcept =0;
+
+    /// *abstract* Sets pixel value at provided coordinates without bounds check
+    virtual constexpr void set_value_raw(const dim_t x, const dim_t y, const bool val)
+        noexcept =0;
+
+    /// Returns pixel value for given coordinates, safely checking for bounds
+    constexpr bool get_value(const dim_t x, const dim_t y) const
+    {
+        this->ensure_in_bounds(x, y);
+        [[likely]] return this->get_value_raw(x, y);
+    }
+
+    /// Sets pixel at coordinates to a given value, safely checking for bounds
+    constexpr void set_value(const dim_t x, const dim_t y, const bool val)
+    {
+        this->ensure_in_bounds(x, y);
+        [[likely]] this->set_value_raw(x, y, val);
+    }
+
+    constexpr auto operator[](const dim_t x) const
+    {
+        return RowIndexer{*this, x};
+    }
+
+    /// Checks whether provided coordinates fit into mask dimension bounds
+    [[gnu::always_inline]]
+    constexpr inline bool is_in_bounds(const dim_t x, const dim_t y) const noexcept
+    {
+        return (x < this->width) && (y < this->height);
+    }
+
+    /// Ensures given coordinates fit into mask dimension bounds,
+    /// raising error if they aren't
+    [[gnu::always_inline]]
+    constexpr inline void ensure_in_bounds(const dim_t x, const dim_t y) const
+    {
+        if (! is_in_bounds(x, y)) [[unlikely]] {
+            throw err::BoundsError("Coordinates ({}, {}) out of {}x{} bounds",
+                                   x, y, this->width, this->height);
+        }
+    }
+
+// @TODO: add pixel set: mask[i][j] = val
+private:
+    class RowIndexer {
+        private:
+            const MaskLike &mask;
+            const dim_t x;
+
+        public:
+            RowIndexer(const MaskLike &mask, const dim_t x) noexcept
+                : mask(mask), x(x) {}
+        
+            [[gnu::always_inline]]
+            constexpr bool operator[](const dim_t y) const
+            {
+                /// (!) Use unsafe raw indexing for better performance
+                return mask.get_value_raw(x, y);
+            }
+    };
+};
 
 template <typename T = unsigned long>
 class BinMask {
