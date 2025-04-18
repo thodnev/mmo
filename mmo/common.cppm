@@ -123,7 +123,7 @@ private:
 
                 // Overload bool() to allow reading the value
                 [[gnu::always_inline]]
-                constexpr operator bool() const noexcept
+                constexpr operator const bool() const noexcept
                 {
                     /// (!) Use unsafe raw indexing for better performance
                     return mask.get_value_raw(x, y);
@@ -135,7 +135,7 @@ private:
                 : mask(mask), x(x) {}
         
             [[gnu::always_inline]]
-            constexpr bool operator[](const dim_t y) const noexcept
+            constexpr auto operator[](const dim_t y) const noexcept
             {
                 
                 return MaskBit(mask, x, y);
