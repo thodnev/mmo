@@ -41,7 +41,7 @@ using types::RelCoord;      ///< Relative coordinates pair [X, Y] inside bbox
 // to ensure efficient storage and access.
 
 /// Map object abstraction
-using map_t = common::BinMask<axis_t>;      // @FIXME: probably BinMask shouldn't be templated
+using map_t = common::BinMask;      // @FIXME: probably BinMask shouldn't be templated
 
 /// Type representing move step. This needs to be signed
 using step_t = std::pair<bbox_t, bbox_t>;

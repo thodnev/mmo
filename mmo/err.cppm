@@ -17,6 +17,8 @@ public:
     explicit Error(std::format_string<Args...> fmt, Args && ...args)
         : message(std::format(fmt, std::forward<Args>(args)...)) {}
 
+    virtual ~Error() = default;
+    
     virtual const char *what() const noexcept override
     {
         return message.c_str();

@@ -25,14 +25,23 @@ public:
 
     dim_t width, height;       ///< Actual dimensions
 
-    virtual ~MaskLike() =0;    ///< Important for proper cleanup in derived classes
+    explicit constexpr MaskLike() noexcept
+        : width(0), height(0) {}
+
+    explicit constexpr MaskLike(const dim_t width, const dim_t height) noexcept
+        : width(width), height(height) {}
+
+    virtual ~MaskLike() = default;    ///< Important for proper cleanup in derived classes
 
     /// *abstract* Returns pixel at coordinates without checking for bounds
-    virtual constexpr bool get_value_raw(const dim_t x, const dim_t y) const noexcept =0;
+    /// (UNSAFE) This may result in out-of-bonds access, so know what you're doing.
+    /// Use `get_value()` instead if bounds check needed
+    virtual bool get_value_raw(const dim_t x, const dim_t y) const noexcept =0;
 
     /// *abstract* Sets pixel value at provided coordinates without bounds check
-    virtual constexpr void set_value_raw(const dim_t x, const dim_t y, const bool val)
-        noexcept =0;
+    /// (UNSAFE) This may result in out-of-bonds access, so know what you're doing.
+    /// Use `set_value()` instead if bounds check needed
+    virtual void set_value_raw(const dim_t x, const dim_t y, const bool val) noexcept =0;
 
     /// Returns pixel value for given coordinates, safely checking for bounds
     constexpr bool get_value(const dim_t x, const dim_t y) const
@@ -48,9 +57,26 @@ public:
         [[likely]] this->set_value_raw(x, y, val);
     }
 
-    constexpr auto operator[](const dim_t x) const
+    /// Allow indexing mask as mask[x][y] and setting value as mask[x][y] = val
+    /// (UNSAFE) For improved performance and consistency with arrays,
+    /// bounds are not checked. Use `get_value(x, y)` for safer, but slower access.
+    constexpr decltype(auto) operator[](this auto &self, const dim_t x) noexcept
     {
-        return RowIndexer{*this, x};
+        return RowIndexer{self, x};
+    }
+
+    /// Count bits set to 1.
+    /// Inefficient implementation, meant to be overridden in child classes
+    virtual inline size_t count_set_bits() const noexcept
+    {
+        size_t res = 0;
+        for (dim_t x = 0; x < width; x++) {
+            for (dim_t y = 0; y < height; y++) {
+                res += get_value_raw(x, y);
+            }
+        }
+
+        return res;
     }
 
     /// Checks whether provided coordinates fit into mask dimension bounds
@@ -71,63 +97,89 @@ public:
         }
     }
 
-// @TODO: add pixel set: mask[i][j] = val
 private:
+    template <typename MaskT>
     class RowIndexer {
         private:
-            const MaskLike &mask;
+            MaskT &mask;
             const dim_t x;
 
+            class MaskBit {
+            private:
+                MaskT &mask;
+                const dim_t x, y;
+            public:
+                constexpr MaskBit(MaskT &mask, const dim_t x, const dim_t y) noexcept
+                    : mask(mask), x(x), y(y) {}
+                
+                /// Set value at coordinates (x, y)
+                [[gnu::always_inline]]
+                constexpr bool operator=(const bool val) noexcept
+                {
+                    /// (!) Use unsafe raw indexing for better performance
+                    mask.set_value_raw(x, y, val);
+                    return val;
+                }
+
+                // Overload bool() to allow reading the value
+                [[gnu::always_inline]]
+                constexpr operator bool() const noexcept
+                {
+                    /// (!) Use unsafe raw indexing for better performance
+                    return mask.get_value_raw(x, y);
+                }
+            };
+
         public:
-            RowIndexer(const MaskLike &mask, const dim_t x) noexcept
+            constexpr RowIndexer(MaskT &mask, const dim_t x) noexcept
                 : mask(mask), x(x) {}
         
             [[gnu::always_inline]]
-            constexpr bool operator[](const dim_t y) const
+            constexpr bool operator[](const dim_t y) const noexcept
             {
-                /// (!) Use unsafe raw indexing for better performance
-                return mask.get_value_raw(x, y);
+                
+                return MaskBit(mask, x, y);
             }
     };
 };
 
-template <typename T = unsigned long>
-class BinMask {
+
+class BinMask : public MaskLike {
 public:
     std::vector<uint8_t> flat;
-    T width, height;
 
-    BinMask() : flat(), width(0), height(0) {};
+    BinMask() : MaskLike(), flat() {};
 
     BinMask(const std::filesystem::path &file) { this->from_png(file); }
 
-    size_t num_set_bits()
+    virtual inline size_t count_set_bits() const noexcept override
     {
         return utils::count_bits(this->flat);
     }
 
-    /// Gets value from coordinate pair, without checking for coordinate bounds
-    /// (UNSAFE) This may result in out-of-bonds access, so know what you're doing.
-    /// Use `get_value()` instead if bounds check needed
     [[gnu::hot, gnu::always_inline]]
-    constexpr inline bool get_value_raw(const T x, const T y) const noexcept
+    virtual inline bool get_value_raw(const dim_t x, const dim_t y)
+        const noexcept override
     {
-        size_t idx = y * this->width + x;
+        size_t idx = this->index_for(x, y);
         auto byte = this->flat[idx / 8];
         return byte & (1 << (7 - (idx % 8)));
     }
 
-    /// Same as `get_value_raw()`, but performs boundary checks
-    constexpr inline bool get_value(const T x, const T y) const
+    [[gnu::hot, gnu::always_inline]]
+    virtual inline void set_value_raw(const dim_t x, const dim_t y, const bool val)
+        noexcept override
     {
-        if ((x >= this->width) || (y >= this->height)) {
-            throw std::out_of_range(std::format(
-                "Coordinates ({}, {}) out of {}x{} size",
-                x, y, this->width, this->height
-            ));
-        }
-    
-        return this->get_value_raw(x, y);
+        const size_t idx = this->index_for(x, y);
+        const int bit = 7 - (idx % 8);
+        auto &byte = this->flat[idx / 8];
+        byte = (byte & ~(1 << bit)) | (val << bit);
+    }
+
+protected:
+    constexpr size_t index_for(const dim_t x, const dim_t y) const noexcept
+    {
+        return static_cast<size_t>(this->width) * y + x;
     }
 
 private:
@@ -142,8 +194,7 @@ private:
 };
 
 
-template <typename T = unsigned long>
-class IndexedBinMask : public BinMask<T> {
+class IndexedBinMask : public BinMask {
 public:
     std::variant<
         //std::monostate,     // prevent default initialization of vectors
@@ -155,13 +206,13 @@ public:
 
     // @TODO: combine constructors into one
     //        using const std::filesystem::path &file = {}
-    IndexedBinMask() : BinMask<T>() { this->_set_indices(); }
-    IndexedBinMask(const std::filesystem::path &file) : BinMask<T>(file)
+    IndexedBinMask() : BinMask() { this->_set_indices(); }
+    IndexedBinMask(const std::filesystem::path &file) : BinMask(file)
     {
         this->_set_indices();
     }
 
-    size_t num_set_bits()
+    virtual inline size_t count_set_bits() const noexcept override
     {
         size_t totalnum;
         std::visit([&totalnum](auto &vec) {
@@ -174,7 +225,7 @@ public:
     // returns coordinates of i-th non-zero element
     Coord get_coord_nonzero(const size_t elnum)
     {
-        auto totalnum = this->num_set_bits();
+        auto totalnum = this->count_set_bits();
 
         if (elnum >= totalnum) {
             throw std::out_of_range(std::format(
@@ -189,10 +240,11 @@ public:
         }, this->indices_set_bits);
 
         // transform flat index to coordinate pair
-        auto y = index / this->width;
-        auto x = index - y * this->width;
+        dim_t y = index / this->width;
+        dim_t x = index - y * this->width;
 
-        return {x, y};
+        // @FIXME
+        return {static_cast<Coord::type>(x), static_cast<Coord::type>(y)};
     }
 
 private:

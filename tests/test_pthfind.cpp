@@ -35,7 +35,7 @@ int main(const int argc, char * const argv[])
     std::cerr << "Test pthfind\n";
 
     // Load test map
-    common::BinMask<axis_t> testmap("tests/maps/pthtest_4x.png");
+    common::BinMask testmap("tests/maps/pthtest_4x.png");
 
     // std::pair from = {148, 257},
     //             to = {239,  19};
@@ -52,10 +52,10 @@ int main(const int argc, char * const argv[])
             560, visited);
 
 
-    dump_path(Coord{(axis_t)from.first, (axis_t)from.second},
-              path);
-    std::cout << "\n\n";
-    dump_visited(visited);
-    //std::cerr << "Visited sz=" << visited.size() << ", Cap=" << visited.capacity() << "\n";
+    // dump_path(Coord{(axis_t)from.first, (axis_t)from.second},
+    //           path);
+    // std::cout << "\n\n";
+    // dump_visited(visited);
+    std::cerr << "Visited sz=" << visited.size() << ", Cap=" << visited.capacity() << "\n";
     return 0;
 }

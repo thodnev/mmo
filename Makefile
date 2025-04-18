@@ -47,7 +47,7 @@ $(bdir)/test_entity: $(call pcm,entity)
 $(bdir)/test_pthfind: $(call pcm,err types utils common pthfind)
 $(bdir)/test_path: $(call pcm,types)
 $(bdir)/test_rnd: $(call pcm,rnd)
-$(bdir)/test_binmask: $(call pcm,utils common)
+$(bdir)/test_binmask: $(call pcm,utils common err)
 
 # Intermodule dependencies
 $(call pcm,entity): | $(call pcm,err)

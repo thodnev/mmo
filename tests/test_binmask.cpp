@@ -8,11 +8,11 @@ int main(const int argc, char * const argv[])
 
     common::BinMask mask("minimap/test4.png");
     std::cout << std::format("Mask size: {} x {}\n", mask.width, mask.height);
-    std::cout << std::format("  set bits: {}\n", mask.num_set_bits());
+    std::cout << std::format("  set bits: {}\n", mask.count_set_bits());
 
     common::IndexedBinMask imask("minimap/test4.png");
     std::cout << std::format("IMask size: {} x {}\n", imask.width, imask.height);
-    std::cout << std::format("  set bits: {}\n", imask.num_set_bits());
+    std::cout << std::format("  set bits: {}\n", imask.count_set_bits());
 
     // std::cout << "NON-ZERO POINTS:\n";
     // for (size_t bit = 0; bit < mask.num_set_bits(); bit++) {
