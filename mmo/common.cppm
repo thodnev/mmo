@@ -161,25 +161,27 @@ public:
     virtual inline bool get_value_raw(const dim_t x, const dim_t y)
         const noexcept override
     {
-        size_t idx = this->index_for(x, y);
+        auto idx = this->index_for(x, y);
         auto byte = this->flat[idx / 8];
-        return byte & (1 << (7 - (idx % 8)));
+        return byte & (0x80 >> (idx % 8));
     }
 
     [[gnu::hot, gnu::always_inline]]
     virtual inline void set_value_raw(const dim_t x, const dim_t y, const bool val)
         noexcept override
     {
-        const size_t idx = this->index_for(x, y);
-        const int bit = 7 - (idx % 8);
+        auto idx = this->index_for(x, y);
+        int bit = 7 - (idx % 8);
         auto &byte = this->flat[idx / 8];
         byte = (byte & ~(1 << bit)) | (val << bit);
     }
 
 protected:
-    constexpr size_t index_for(const dim_t x, const dim_t y) const noexcept
-    {
-        return static_cast<size_t>(this->width) * y + x;
+    [[gnu::always_inline]]
+    constexpr inline uint32_t index_for(const dim_t x, const dim_t y) const noexcept
+    {   
+        static_assert(sizeof(x) + sizeof(y) <= sizeof(uint32_t), "Won't fit");
+        return static_cast<uint32_t>(y) * this->width + x;
     }
 
 private:
