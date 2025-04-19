@@ -5,7 +5,8 @@ module;
 // language features, to crank the hell out of performance.
 // Hope it gets encapsulated by the upper hierarchy code.
 
-#include <boost/heap/fibonacci_heap.hpp>
+// #include <boost/heap/fibonacci_heap.hpp>
+#include <boost/heap/d_ary_heap.hpp>
 
 #include "macro.hpp"
 
@@ -333,6 +334,7 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
     // recalculate bbox based on map boundaries
     // top left corner serves as a coordinate offset to map global <-> relative coords
     const BBox bbox(from, radius);
+    // (!) @TODO: fixme: most coordinate should be less than map boundary
 
     if (USE_DEBUG) {
         [[maybe_unused]] const Coord bbox_base = bbox.base;
@@ -376,7 +378,10 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
 
     // Fuck slow STL data structures.
     // Use Boost Fibonacci heap until we find something better
-    boost::heap::fibonacci_heap<HeapEntry> heapq;
+    // boost::heap::fibonacci_heap<HeapEntry> heapq;
+    
+    // It was timed and arity 6 showed the best overall performance
+    boost::heap::d_ary_heap<HeapEntry, boost::heap::arity<6>> heapq;
     // put the starting element
     heapq.push(HeapEntry{.total_dist = std::numeric_limits<dist_t>::max(),
                          .pure_dist = 0,
@@ -389,8 +394,12 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
     // start traversal
     _time_init.report_took("initialization");
     utils::TimeIt _time_lookup{};
+    // size_t maxcount = 0;
 
     while (! heapq.empty()) {
+        // size_t count = heapq.size();
+        // if (count > maxcount) maxcount = count;
+
         // dequeue lowest element
         const auto el = heapq.top();
         heapq.pop();        // remove from heap
@@ -398,6 +407,7 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
         // check whether destination reached
         if (el.coord == bboxed_to) {            // found
             _time_lookup.report_took("map traversal");
+            // LOG("Max heap depth: {}", maxcount);
             LOG("FOUND PATH");
 
             if (set_visited) {

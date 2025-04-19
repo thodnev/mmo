@@ -68,3 +68,27 @@ Which gives the following movements translation (coordinates start as usual, in 
 
 * Use octile distance metric
 * Use A* algorithm
+
+
+### Heap Queue performance details
+In A* algorithm we use a heap queue. Different implementations were timed
+and below are their performance results for 652 x 644 map:
+
+Map: [pthtest_4x.png](/tests/maps/pthtest_4x.png)  
+Map size: 652 x 644 pixels  
+Coordinates: from `(298, 512)` to  `(466,  37)`  
+![map_path](img/heapq_map_coords.png)
+
+Timing repeated 10k times with random 10..1010 ms invocation interval.
+
+
+| HeapQ                          | avg, ms | min, ms | max, ms | std dev, ms | historgam                                  |
+| ------------------------------ | ------- | ------- | ------- | ----------- | ------------------------------------------ |
+| Fibonacci heap                 | 35.09   | 30.78   | 59.43   | ± 4.61      | ![fib_histogram](img/heapq_fib_hist.png)   |
+| D-Ary, arity = 2 (binary heap) | 20.25   | 16.17   | 43.63   | ± 4.68      | ![ary2_histogram](img/heapq_ary2_hist.png) |
+| D-Ary, arity = 3               | 17.09   | 13.52   | 38.32   | ± 4.44      | ![ary3_histogram](img/heapq_ary3_hist.png) |
+| D-Ary, arity = 4               | 17.46   | 12.98   | 36.68   | ± 4.63      | ![ary4_histogram](img/heapq_ary4_hist.png) |
+| D-Ary, arity = 5               | 16.31   | 12.54   | 35.58   | ± 4.42      | ![ary5_histogram](img/heapq_ary5_hist.png) |
+| D-Ary, arity = 6               | 16.71   | 12.26   | 34.67   | ± 4.63      | ![ary6_histogram](img/heapq_ary6_hist.png) |
+| D-Ary, arity = 7               | 15.90   | 12.50   | 35.26   | ± 4.37      | ![ary7_histogram](img/heapq_ary7_hist.png) |
+| D-Ary, arity = 8               | 17.26   | 12.69   | 35.86   | ± 4.46      | ![ary8_histogram](img/heapq_ary8_hist.png) |

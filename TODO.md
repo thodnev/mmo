@@ -6,6 +6,8 @@
 
 ## Pathfinding
 
+- [ ] Fixup `most` bbox coordinate. Must never go outside of map bounds
+
 Higher-order tasks:
 - [x] Implement pathfinding algo in raw form;
 - [x] Refactor as a separate module, encapsulating and abstracting out the details;
