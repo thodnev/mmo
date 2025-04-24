@@ -86,8 +86,8 @@ struct CoordBase {
     {
         // use (x, y) for absolute and [x, y] for relative coords
         return std::format(
-            std::is_same<Tag, CoordTag_Absolute>::value ?
-            "({}, {})" : "[{}, {}]", x, y);
+            std::is_same<Tag, CoordTag_Relative>::value ?
+            "[{}, {}]" : "({}, {})", x, y);
     }
 
     friend std::ostream& operator<<(std::ostream &out, const CoordBase<T, Tag> &coord)

@@ -14,15 +14,25 @@ export module common;
 
 export namespace common {
 
+// @TODO: won't be needed anymore after refactoring
 using types::Coord;   // Make available in this namespace
+
+/// Axis type for binary masks
+/// 16 bits should be enough to hold binary images up to 4 GiB
+using dim_t = uint16_t;    ///< Dimension type alias
+
+// @TODO: probably these need to be put into types module
+/// Used to tag specific CoordBase for strong typing
+enum class CoordTag_Mask {};
+/// A specific Coord-based type used in masks.
+/// It has an implemenation similar to other coordinate types, but they
+/// mean completely different things and are non-interchangeable as-is
+using MaskPoint = types::CoordBase<dim_t, CoordTag_Mask>;
 
 
 /// Interface defining common core functionality required from all BinMask classes
 class MaskLike {
 public:
-    // 16 bits should be enough for holding up to 4 GiB binary images
-    using dim_t = uint16_t;    ///< Dimension type alias
-
     dim_t width, height;       ///< Actual dimensions
 
     explicit constexpr MaskLike() noexcept
@@ -36,11 +46,13 @@ public:
     /// *abstract* Returns pixel at coordinates without checking for bounds
     /// (UNSAFE) This may result in out-of-bonds access, so know what you're doing.
     /// Use `get_value()` instead if bounds check needed
+    [[gnu::hot, gnu::always_inline]]
     virtual bool get_value_raw(const dim_t x, const dim_t y) const noexcept =0;
 
     /// *abstract* Sets pixel value at provided coordinates without bounds check
     /// (UNSAFE) This may result in out-of-bonds access, so know what you're doing.
     /// Use `set_value()` instead if bounds check needed
+    [[gnu::hot, gnu::always_inline]]
     virtual void set_value_raw(const dim_t x, const dim_t y, const bool val) noexcept =0;
 
     /// Returns pixel value for given coordinates, safely checking for bounds
@@ -193,6 +205,48 @@ private:
         this->height = img.height;
     }
 
+};
+
+
+/// A view on a fragment of the existing mask
+class MaskView : public MaskLike {
+public:
+    MaskLike &mask;         ///< Any mask we're taking a view of
+    const MaskPoint base;   ///< Base (starting) point inside the mask,
+                            ///< from which the own width and height are offset
+
+
+    MaskView(MaskLike &mask, const dim_t offset_x, const dim_t offset_y,
+             const dim_t width, const dim_t height)
+        : MaskLike(width, height), mask(mask), base(offset_x, offset_y)
+    {
+        if (static_cast<size_t>(offset_x) + width >= mask.width ||
+            static_cast<size_t>(offset_y) + height >= mask.height) [[unlikely]] {
+            
+            throw err::BoundsError("MaskView is out of underlying mask bounds {}x{}",
+                                   mask.width, mask.height);
+        }
+    }
+
+    /// A more specific contstructor to avoid stacking views on top of each other
+    constexpr MaskView(MaskView &view, const dim_t offset_x, const dim_t offset_y,
+                       const dim_t width, const dim_t height)
+        : MaskView(view.mask, view.base.x + offset_x, view.base.y + offset_y,
+                   width, height) {}
+
+    [[gnu::hot, gnu::always_inline]]
+    virtual inline bool get_value_raw(const dim_t x, const dim_t y)
+        const noexcept override
+    {
+        return mask.get_value_raw(base.x + x, base.y + y);
+    }
+
+    [[gnu::hot, gnu::always_inline]]
+    virtual inline void set_value_raw(const dim_t x, const dim_t y, const bool val)
+        noexcept override
+    {
+        return mask.set_value_raw(base.x + x, base.y + y, val);
+    }
 };
 
 

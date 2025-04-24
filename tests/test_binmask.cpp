@@ -1,6 +1,18 @@
 #include <iostream>
+#include <sstream>
 
 import common;
+
+void dump_mask(const common::MaskLike &mask, std::ostream &out = std::cerr)
+{
+    for (size_t i = 0; i < mask.width; i++) {
+        for (size_t j = 0; j < mask.height; j++) {
+            out << (mask[i][j] ? "##" : "  ");
+        }
+        out << "\n";
+    }
+}
+
 
 int main(const int argc, char * const argv[])
 {
@@ -51,5 +63,17 @@ int main(const int argc, char * const argv[])
 
     // std::cout << "out of bonds: " << mask.get_value(33, 37) << std::endl;
 
-return 0;
+    common::BinMask tst("minimap/test2.png");
+    cerr << std::format("Mask view for mask {}x{}\n", tst.width, tst.height);
+    common::MaskView view(tst, 24, 28, 5, 5);
+    dump_mask(view);
+
+    cerr << "Views stacking:\t";
+    // common::MaskView smaller(*reinterpret_cast<common::MaskLike *>(&view), 1, 1, 3, 3);
+    common::MaskView smaller(view, 1, 1, 3, 3);
+    cerr << (&view.mask == &smaller.mask ?
+        "[OK], same ref" : "[(!) FAILED] refs differ") << "\n";
+    dump_mask(smaller);
+
+    return 0;
 }
