@@ -164,16 +164,19 @@ struct BBox {
     Coord base;     ///< absolute point (top leftmost) from which relative coords offset
     RelCoord most;  ///< relative coordinate defining bottom right boundary
 
-    explicit BBox(const Coord &from,
+    explicit BBox(const map_t &map, const Coord &from,
                   const bbox_t bbox_width, const bbox_t bbox_height)
-        : base{(axis_t)std::max((long)from.x - bbox_width, 0L),
-               (axis_t)std::max((long)from.y - bbox_height, 0L)},
-          most{static_cast<bbox_t>(bbox_width * 2 + 1),
-               static_cast<bbox_t>(bbox_height * 2 + 1)}
-        {}
 
-    explicit BBox(const Coord &from, const bbox_t bbox_radius)
-        : BBox(from, bbox_radius, bbox_radius) {}
+    {
+        base = {(axis_t)std::max((long)from.x - bbox_width, 0L),
+                (axis_t)std::max((long)from.y - bbox_height, 0L)};
+        
+        most = {(bbox_t)std::max(from.x - base.x + bbox_width, map.width - 1),
+                (bbox_t)std::max(from.y - base.y + bbox_width, map.height - 1)};
+    }
+
+    explicit BBox(const map_t &map, const Coord &from, const bbox_t bbox_radius)
+        : BBox(map, from, bbox_radius, bbox_radius) {}
 
     BBox(const BBox &) = delete;       //< Delete copy constructor
     BBox(BBox &&) = delete;            //< and move constructor
@@ -333,7 +336,7 @@ constexpr void reconstruct_visited(const BBox &bbox, const std::vector<VisitedEn
 
     // recalculate bbox based on map boundaries
     // top left corner serves as a coordinate offset to map global <-> relative coords
-    const BBox bbox(from, radius);
+    const BBox bbox(map, from, radius);
     // (!) @TODO: fixme: most coordinate should be less than map boundary
 
     if (USE_DEBUG) {
