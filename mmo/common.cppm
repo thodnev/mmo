@@ -200,6 +200,7 @@ private:
     void from_png(const std::filesystem::path &file)
     {
         png_wrap::PngImage img(file);
+        img.load();
         this->flat = utils::flatten_bits(img.data, img.width, img.height);
         this->width = img.width;
         this->height = img.height;

@@ -66,6 +66,9 @@ public:
 
 
 // Exceptions for different project modules
-
+class PngError : public ResourceError {
+public:
+    using ResourceError::ResourceError;
+};
 
 }   // namespace

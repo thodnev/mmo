@@ -44,17 +44,19 @@ all: | $(bdir)/main main
 
 # Test dependencies
 $(bdir)/test_entity: $(call pcm,entity)
-$(bdir)/test_pthfind: $(call pcm,err types utils common pthfind)
+$(bdir)/test_pthfind: $(call pcm,err types utils common pthfind) $(call obj,png_wrap)
 $(bdir)/test_path: $(call pcm,types)
 $(bdir)/test_rnd: $(call pcm,rnd)
-$(bdir)/test_binmask: $(call pcm,utils common err)
+$(bdir)/test_binmask: $(call obj,png_wrap) $(call pcm,utils common err)
 
 # Intermodule dependencies
 $(call pcm,entity): | $(call pcm,err)
 $(call pcm,types): | $(call pcm,err)
-$(call pcm,common): | $(call pcm,types utils)
+$(call pcm,common): | $(call obj,png_wrap) $(call pcm,types utils)
 $(call pcm,pthfind): | $(call pcm,common)
 $(call pcm,utils): | $(call pcm,err)
+
+$(call obj,png_wrap): $(call pcm,err)
 
 # General dependencies
 $(bdir)/main.o: $(pcm_modules)
