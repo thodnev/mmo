@@ -20,6 +20,7 @@ public:
     PngImage(const std::filesystem::path &file)
         : width(0), height(0), file(file), data() {}
     
+    /// Loads image from file
     void load();
 };
 

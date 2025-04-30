@@ -1,28 +1,71 @@
 #include "png_wrap.hpp"
+#include <fstream>
 #include <png.h>
+#include "macro.hpp"
 
 import err;
 
+// @TODO: 
+// - adapt to reading from any input file stream
+// - custom error functions and default C++ mem allocator instead of libpng defaults
+// - save to file implementation
+
 namespace png_wrap {
-PngImageData load_png(const std::filesystem::path &file,
+
+/// A helper to get the stream object reference out of png_struct
+template <typename stream_t>
+static constexpr stream_t& _png_get_stream(png_structp png_ptr)
+{
+    // Returns (void *) but we know what it is, since we passed it ourselves
+    void *stream_ptr = png_get_io_ptr(png_ptr);
+    stream_t &stream = *static_cast<stream_t *>(stream_ptr);
+    return stream;
+}
+
+/// libpng custom user_read_data function used in png_set_read_fn
+template <typename stream_t = std::ifstream>
+static void _png_read_data(png_structp png_ptr, png_bytep data, size_t length)
+{
+    auto &inp = _png_get_stream<stream_t>(png_ptr);
+    inp.read(reinterpret_cast<stream_t::char_type *>(data), length);
+}
+
+/// libpng custom user_write_data function used in png_set_write_fn
+template <typename stream_t = std::ofstream>
+static void _png_write_data(png_structp png_ptr, png_bytep data, size_t length)
+{
+    auto &out = _png_get_stream<stream_t>(png_ptr);
+    out.write(reinterpret_cast<stream_t::char_type *>(data), length);
+}
+
+/// libpng custom user_flush_data function used in png_set_write_fn
+template <typename stream_t = std::ofstream>
+static void _png_flush_data(png_structp png_ptr)
+{
+    auto &out = _png_get_stream<stream_t>(png_ptr);
+    out.flush();
+}
+
+static PngImageData load_png(const std::filesystem::path &file_path,
                              const size_t MAX_DIM = 4096 * 4096)
 {
-    std::FILE *fp = fopen(file.c_str(), "rb");
-    if (nullptr == fp) {
-        throw err::PngError("Cannot open file {}", (std::string)file);
+    // Rely on RAII to automatically close the file on scope exit
+    std::ifstream file(file_path, std::ios::binary);
+
+    if (!file.is_open()) {
+        throw err::PngError("Cannot open file {}", (std::string)file_path);
     }
 
     // read bytes 0..7 and pass to libpng to check header
     std::vector<uint8_t> header(8);
-    auto nrd = std::fread(&header[0], sizeof(header[0]), header.size(), fp);
-    if (header.size() != nrd) {
-        std::fclose(fp);
-        throw err::PngError("File {} read failed", (std::string)file);
+    file.read(reinterpret_cast<char *>(&header[0]), header.size());
+    // LOG("Read size: {}, header size: {}", file.gcount(), header.size());
+    if (static_cast<std::streamsize>(header.size()) != file.gcount()) {
+        throw err::PngError("File {} read failed", (std::string)file_path);
     }
 
     if (png_sig_cmp(header.data(), 0, header.size())) {
-        std::fclose(fp);
-        throw err::PngError("File {} is not PNG",  (std::string)file);
+        throw err::PngError("File {} is not PNG",  (std::string)file_path);
     }
 
     png_structp png_ptr = png_create_read_struct(
@@ -30,14 +73,12 @@ PngImageData load_png(const std::filesystem::path &file,
         nullptr, nullptr, nullptr);
 
     if (nullptr == png_ptr) {
-        std::fclose(fp);
         throw err::PngError("Alloc read_struct");
     }
 
     png_infop info_ptr = png_create_info_struct(png_ptr);
     if (nullptr == info_ptr) {
         png_destroy_read_struct(&png_ptr, nullptr, nullptr);
-        std::fclose(fp);
         throw err::PngError("Alloc info_struct");
     }
 
@@ -45,7 +86,6 @@ PngImageData load_png(const std::filesystem::path &file,
         if (!testval)
             return;
         png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
-        std::fclose(fp);
         throw err::PngError(msg, std::forward<Args>(args)...);
     };
 
@@ -55,14 +95,13 @@ PngImageData load_png(const std::filesystem::path &file,
     if (setjmp(png_jmpbuf(png_ptr)))
     {
         // We get back here if any error occurs
-        err_on(true, "libpng error reading {}", (std::string)file);
-        // png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
-        // std::fclose(fp);
-        // throw err::PngError(READ_FAIL_MSG);
+        err_on(true, "libpng error reading {}", (std::string)file_path);
     }
 
     // Set up the input control for using standard C streams
-    png_init_io(png_ptr, fp);
+    //png_init_io(png_ptr, fp);
+
+    png_set_read_fn(png_ptr, &file, _png_read_data<decltype(file)>);
 
     // We have already read some of the signature
     png_set_sig_bytes(png_ptr, header.size());
@@ -83,7 +122,7 @@ PngImageData load_png(const std::filesystem::path &file,
     res.width = png_get_image_width(png_ptr, info_ptr);
     res.height = png_get_image_height(png_ptr, info_ptr);
 
-    err_on(res.width * res.height > MAX_DIM, "Image size {} x {} > {}",
+    err_on(res.width * res.height > MAX_DIM, "Image size {}x{} > {}",
            res.width, res.height, MAX_DIM);
 
     auto bit_depth = png_get_bit_depth(png_ptr, info_ptr);
@@ -112,13 +151,21 @@ PngImageData load_png(const std::filesystem::path &file,
     png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 
     // close the file
-    std::fclose(fp);
+    // std::fclose(fp);
 
     // set own data
     res.data = matrix;
 
     return res;
 }
+
+
+static void save_png(const PngImageData &img, const std::filesystem::path &file)
+{
+    // @TODO:
+    // ...
+}
+
 
 void PngImage::load()
 {
