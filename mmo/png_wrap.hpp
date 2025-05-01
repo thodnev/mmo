@@ -1,10 +1,12 @@
 #include <filesystem>
 #include <vector>
+#include <cstdint>
 
 namespace png_wrap {
 
 struct PngImageData {
     unsigned long width, height;
+    uint8_t bit_depth;
     std::vector<std::vector<uint8_t>> data;
 };
 
@@ -22,6 +24,9 @@ public:
     
     /// Loads image from file
     void load();
+
+    /// Saves image to file
+    void save();
 };
 
 }   // namespace

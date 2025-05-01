@@ -48,6 +48,7 @@ $(bdir)/test_pthfind: $(call pcm,err types utils common pthfind) $(call obj,png_
 $(bdir)/test_path: $(call pcm,types)
 $(bdir)/test_rnd: $(call pcm,rnd)
 $(bdir)/test_binmask: $(call obj,png_wrap) $(call pcm,utils common err)
+$(bdir)/test_png: $(call obj,png_wrap) $(call pcm,err)
 
 # Intermodule dependencies
 $(call pcm,entity): | $(call pcm,err)
