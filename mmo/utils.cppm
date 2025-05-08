@@ -55,6 +55,17 @@ size_t count_bits(const std::vector<T> &vec)
 }
 
 
+/// Converts row-major packed bits into completely flat representation.
+/// @see unflatten_bits for corresponding inverse function
+/// @param matrix - Input in a form of matrix with each byte filled with data bits,
+///     up to the last byte (which is filled partially if width % 8 != 0)
+///         row0:  | byte 0.0 | byte 0.1 | ... | byte 0.N |
+/// @param width - Image (matrix) width
+/// @param height - Image (matrix) height
+/// @returns Vector as a flat sequence of bytes, as if rows conatenated together,
+///     with no gaps and bits filled in every byte (except the last byte, which
+///     may get only partially filled, from highest to lowest bits)
+///     | row0 bits | row1 bits | ... | rowN bits |
 std::vector<uint8_t> flatten_bits(
     const std::vector<std::vector<uint8_t>> &matrix,
     unsigned long width,
@@ -106,15 +117,70 @@ std::vector<uint8_t> flatten_bits(
         flat.push_back(carry);
     }
 
-    // if (0 == (imwidth % 8)) {       // simple case
-    //     for (const auto &row : matrix) {
-    //         flat.insert(flat.end(), row.begin(), row.end());
-    //     }
-    // } else {
-    //     // ...
-    // }
-
     return flat;
+}
+
+
+/// Converts a flat bits representation into row-major packed bits
+/// @see flatten_bits for an inverse companion
+/// @param flat - A flat vector, with each byte filled with data bits
+///     as rows concatenated together and no gaps
+/// @param width - Image (matrix) width
+/// @param height - Image (matrix) height
+/// @returns Matrix in row-major form, with bytes in rows filled with corresponding
+///     bits, except for the last byte of each row (which may get filled only
+///     partially, with high to low bits order).
+std::vector<std::vector<uint8_t>> unflatten_bits(
+    const std::vector<uint8_t> &flat,
+    unsigned long width,
+    unsigned long height)
+{
+    const auto rowbytes = (width + 7) / 8;
+    const auto fullbytes = width / 8;
+    const uint8_t rest_bits = width % 8;
+
+    // preallocate
+    std::vector<std::vector<uint8_t>> res(height, std::vector<uint8_t>(rowbytes));
+
+    uint8_t carry = 0;
+    uint8_t carry_bits = 0;     // number of bits currently in carry
+    auto ix = flat.begin();
+    for (decltype(height) nrow = 0; nrow < height; nrow++) {
+        // process full bytes first
+        for (decltype(width) ncol = 0; ncol < fullbytes; ncol++) {
+            uint8_t byte = *ix++;
+
+            uint8_t el = carry | (byte >> carry_bits);
+            carry = (byte << (8 - carry_bits)) & 0xFF;
+
+            res[nrow][ncol] = el;
+        }
+
+        // if dealing with complete bytes, skip the last partial byte processing
+        if (rest_bits == 0)
+            continue;
+
+        // process partial (last) byte when needed
+        if (carry_bits >= rest_bits) {  // carry has enough bits to fill element
+            // -> no read needed
+            uint8_t el = carry & ~(0xFF >> rest_bits);
+            carry <<= rest_bits;
+            carry_bits -= rest_bits;
+
+            res[nrow][fullbytes] = el;
+        } else {                        // carry doesn't have enough bits yet
+            // -> consume what we have and read the rest
+            uint8_t byte = *ix++;
+            uint8_t el = carry | (byte >> carry_bits);
+            el &= ~(0xFF >> rest_bits);
+            carry = (byte << (rest_bits - carry_bits)) & 0xFF;
+            carry_bits = 8 - (rest_bits - carry_bits);
+
+            res[nrow][fullbytes] = el;
+        }
+    }
+
+    return res;
 }
 
 

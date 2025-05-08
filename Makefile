@@ -9,9 +9,11 @@ objs := main png_wrap
 tests := rnd
 
 CXX = clang++
-CXXFLAGS += -std=c++2c -I$(pdir) -fprebuilt-module-path=$(bdir)/
-CXXFLAGS += -O3 -flto -Wall -Wextra -ggdb3 #-pg
-LDFLAGS = -std=c++2c -O3 -flto -I$(pdir) -fprebuilt-module-path=$(bdir)/ -ggdb3 # -pg
+# Common flags for compiling & linking steps
+FLAGS = -std=c++2c -I$(pdir) -fprebuilt-module-path=$(bdir)/
+FLAGS += -Wall -Wextra -O3 -flto -ggdb3 #-pg
+CXXFLAGS += $(FLAGS)
+LDFLAGS += $(FLAGS)
 LDLIBS = $(shell pkg-config libpng --libs)
 # LDLIBS = -Ldeps/libpng -l:libpng.a -lz
 CXXFLAGS += -DDEBUG
@@ -48,7 +50,7 @@ $(bdir)/test_pthfind: $(call pcm,err types utils common pthfind) $(call obj,png_
 $(bdir)/test_path: $(call pcm,types)
 $(bdir)/test_rnd: $(call pcm,rnd)
 $(bdir)/test_binmask: $(call obj,png_wrap) $(call pcm,utils common err)
-$(bdir)/test_png: $(call obj,png_wrap) $(call pcm,err)
+$(bdir)/test_png: $(call obj,png_wrap) $(call pcm,err utils)
 
 # Intermodule dependencies
 $(call pcm,entity): | $(call pcm,err)
